@@ -16,7 +16,11 @@ GLFWwindow* window;
 
 GLuint vertex_shader;
 GLuint fragment_shader;
-GLuint program;
+GLuint draw_program;
+
+GLuint compute_shader;
+GLuint compute_program;
+GLuint texture;
 
 GLuint compileShader(const char path[], GLenum type) {
 	GLuint shader = glCreateShader(type);
@@ -44,6 +48,9 @@ GLuint compileShader(const char path[], GLenum type) {
 		break;
 	case GL_FRAGMENT_SHADER:
 		tag = "@shader:fragment";
+		break;
+	case GL_COMPUTE_SHADER:
+		tag = "@shader:compute";
 		break;
 	}
 
@@ -81,6 +88,42 @@ GLuint compileShader(const char path[], GLenum type) {
 	return shader;
 }
 
+GLuint linkProgram(const GLuint shaders[], uint32_t n_shaders) {
+	GLuint program = glCreateProgram();
+
+	for (uint32_t i = 0; i < n_shaders; ++i) {
+		glAttachShader(program, shaders[i]);
+	}
+
+	glLinkProgram(program);
+
+	GLint log_length = 0;
+	glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
+	if (log_length > 0) {
+		char* log = static_cast<char*>(alloca(log_length));
+		glGetProgramInfoLog(program, log_length, nullptr, log);
+		fprintf(stderr, "%s\n", log);
+		return 0;
+	}
+
+	for (uint32_t i = 0; i < n_shaders; ++i) {
+		glDetachShader(program, shaders[i]);
+	}
+
+	return program;
+}
+
+void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
+                                GLuint /*id*/, GLenum severity,
+                                GLsizei /*length*/, const GLchar* message,
+                                const void* /*user_param*/) {
+	if (type != GL_DEBUG_TYPE_ERROR_KHR)
+		return;
+
+	fprintf(stderr, "GL ERROR: type = 0x%x, severity = 0x%x, message = %s\n",
+	        type, severity, message);
+}
+
 } // namespace
 
 int main() {
@@ -107,37 +150,49 @@ int main() {
 	gladLoadGLES2(glfwGetProcAddress);
 	glfwSwapInterval(1);
 
+	glEnable(GL_DEBUG_OUTPUT_KHR);
+	glDebugMessageCallbackKHR(glDebugCallback, 0);
+
 	vertex_shader = compileShader("assets/base.glsl", GL_VERTEX_SHADER);
 	fragment_shader = compileShader("assets/base.glsl", GL_FRAGMENT_SHADER);
+	GLuint draw_shaders[] = {vertex_shader, fragment_shader};
+	draw_program = linkProgram(draw_shaders, 2);
 
-	program = glCreateProgram(); {
-		glAttachShader(program, vertex_shader);
-		glAttachShader(program, fragment_shader);
-		glLinkProgram(program);
-		GLint log_length = 0;
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
-		if (log_length > 0) {
-			char* log = static_cast<char*>(alloca(log_length));
-			glGetProgramInfoLog(program, log_length, nullptr, log);
-			fprintf(stderr, "%s\n", log);
-		}
+	compute_shader = compileShader("assets/rt.glsl", GL_COMPUTE_SHADER);
+	compute_program = linkProgram(&compute_shader, 1);
+	glUseProgram(compute_program);
 
-		glDetachShader(program, fragment_shader);
-		glDetachShader(program, vertex_shader);
-	}
+	glGenTextures(1, &texture);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F,
+	               window_default_width, window_default_height);
+	glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
 
-		glUseProgram(program);
+		glUseProgram(compute_program);
+		glDispatchCompute(window_default_width, window_default_height, 1);
+
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		glUseProgram(draw_program);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		
 		glfwSwapBuffers(window);
 	}
 
-	glDeleteProgram(program);
+	glDeleteTextures(1, &texture);
+
+	glDeleteShader(compute_shader);
+	glDeleteProgram(compute_program);
+
+	glDeleteProgram(draw_program);
 	glDeleteShader(fragment_shader);
 	glDeleteShader(vertex_shader);
 

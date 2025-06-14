@@ -36,6 +36,6 @@ set(GLFW_BUILD_DOCS OFF)
 
 FetchContent_MakeAvailable(glfw glad)
 
-glad_add_library(glad_gles3 STATIC API gles2=3.0)
+glad_add_library(glad STATIC API gles2=3.1 EXTENSIONS GL_KHR_debug)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad_gles3)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad)
