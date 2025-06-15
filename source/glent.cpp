@@ -6,11 +6,20 @@
 #include <GLFW/glfw3.h>
 #include <glad/gles2.h>
 
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/trigonometric.hpp>
+
 namespace {
 
 constexpr int32_t window_default_width = 1280;
 constexpr int32_t window_default_height = 720;
 constexpr char window_title[] = "Glent";
+
+struct Vertex {
+	glm::vec4 position;
+	glm::vec4 color;
+};
 
 GLFWwindow* window;
 
@@ -21,6 +30,9 @@ GLuint draw_program;
 GLuint compute_shader;
 GLuint compute_program;
 GLuint texture;
+
+GLuint vertex_buffer;
+GLuint uniform_buffer;
 
 GLuint compileShader(const char path[], GLenum type) {
 	GLuint shader = glCreateShader(type);
@@ -173,8 +185,30 @@ int main() {
 	               window_default_width, window_default_height);
 	glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
+	Vertex vertices[] {
+		{{-1.0f, -1.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 0.0f}},
+		{{+1.0f, -1.0f, +0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}},
+		{{+0.0f, +1.0f, +0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}},
+	};
+
+	glGenBuffers(1, &vertex_buffer);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertex_buffer);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vertex_buffer);
+
+	glGenBuffers(1, &uniform_buffer);
+	glBindBuffer(GL_UNIFORM_BUFFER, uniform_buffer);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec4), nullptr, GL_STATIC_DRAW);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 2, uniform_buffer);
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
+
+		float t = float(glfwGetTime());
+		glm::vec3 origin = glm::vec3(glm::cos(t), glm::sin(t), -5.0f);
+		glBindBuffer(GL_UNIFORM_BUFFER, uniform_buffer);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::vec4), &origin);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 		glUseProgram(compute_program);
 		glDispatchCompute(window_default_width, window_default_height, 1);
