@@ -3,7 +3,7 @@ include(FetchContent)
 
 project(glent LANGUAGES C CXX)
 
-add_executable(${PROJECT_NAME} source/glent.cpp)
+add_executable(${PROJECT_NAME} source/glent.cpp source/graphics.cpp)
 
 if(LINUX)
 	target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)

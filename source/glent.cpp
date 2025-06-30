@@ -7,6 +7,9 @@
 #include <GLFW/glfw3.h>
 #include <glad/gles2.h>
 
+#include "graphics.hpp"
+using namespace glent;
+
 namespace {
 
 constexpr int32_t window_default_width = 1280;
@@ -14,17 +17,6 @@ constexpr int32_t window_default_height = 720;
 constexpr char window_title[] = "Glent";
 
 GLFWwindow* window;
-
-void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
-                                GLuint /*id*/, GLenum /*severity*/,
-                                GLsizei /*length*/, const GLchar* message,
-                                const void* /*user_param*/) {
-	if (type != GL_DEBUG_TYPE_ERROR_KHR) {
-		return;
-	}
-
-	std::cerr << "GLES ERROR: " << message << '\n';
-}
 
 } // namespace
 
@@ -56,38 +48,26 @@ int main() {
 
 	glfwSwapInterval(1);
 
-	glEnable(GL_DEBUG_OUTPUT_KHR);
-	glDebugMessageCallbackKHR(glDebugCallback, 0);
+	graphics::setup(window_default_width, window_default_height);
+	using graphics::Buffer;
+	using graphics::Shader;
+	using graphics::VertexAttribute;
+	using graphics::Pipeline;
 
 	const float vertices[] = {
 		-1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
 		1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-		0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
 	};
 
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	auto* vertex_buffer = new Buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
+	                                 sizeof(vertices), vertices);
 
-	const uint16_t indices[] = {0, 1, 2};
+	const uint16_t indices[] = {0, 1, 2, 1, 3, 2};
 
-	GLuint ibo;
-	glGenBuffers(1, &ibo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-	GLuint vao;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribBinding(0, 0);
-	glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0);
-
-	glEnableVertexAttribArray(1);
-	glVertexAttribBinding(1, 0);
-	glVertexAttribFormat(1, 4, GL_FLOAT, GL_FALSE, 3 * sizeof(float));
+	auto* index_buffer = new Buffer(GL_ELEMENT_ARRAY_BUFFER, GL_STATIC_DRAW,
+	                                sizeof(indices), indices);
 
 	const char vs_src[] = R"(
 		#version 300 es
@@ -103,24 +83,7 @@ int main() {
 		}
 	)";
 
-	const GLchar* vs_src_str = vs_src;
-	GLint vs_src_length = sizeof(vs_src);
-
-	GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vs, 1, &vs_src_str, &vs_src_length);
-	glCompileShader(vs);
-
-	GLint vs_status;
-	glGetShaderiv(vs, GL_COMPILE_STATUS, &vs_status);
-	if (!vs_status) {
-		GLint log_length;
-		glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &log_length);
-
-		char* log = static_cast<char*>(alloca(log_length));
-		glGetShaderInfoLog(vs, log_length, nullptr, log);
-
-		std::cerr << "Vertex shader compilation error:\n" << log << '\n';
-	}
+	auto* vertex_shader = new Shader(GL_VERTEX_SHADER, vs_src);
 
 	const char fs_src[] = R"(
 		#version 300 es
@@ -135,55 +98,37 @@ int main() {
 		}
 	)";
 
-	const GLchar* fs_src_str = fs_src;
-	GLint fs_src_length = sizeof(fs_src);
+	auto* fragment_shader = new Shader(GL_FRAGMENT_SHADER, fs_src);
 
-	GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fs, 1, &fs_src_str, &fs_src_length);
-	glCompileShader(fs);
+	const VertexAttribute attributes[] = {
+		{0, GL_FLOAT, 3, false},
+		{1, GL_FLOAT, 4, false},
+	};
 
-	GLint fs_status;
-	glGetShaderiv(fs, GL_COMPILE_STATUS, &fs_status);
-	if (!fs_status) {
-		GLint log_length;
-		glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &log_length);
-
-		char* log = static_cast<char*>(alloca(log_length));
-		glGetShaderInfoLog(fs, log_length, nullptr, log);
-
-		std::cerr << "Fragment shader compilation error:\n" << log << '\n';
-	}
-
-	GLuint program = glCreateProgram();
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
-	glLinkProgram(program);
-
-	GLint program_status;
-	glGetProgramiv(program, GL_LINK_STATUS, &program_status);
-	if (!program_status) {
-		GLint log_length;
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
-
-		char* log = static_cast<char*>(alloca(log_length));
-		glGetProgramInfoLog(program, log_length, nullptr, log);
-
-		std::cerr << "Shader linking error:\n" << log << '\n';
-	}
+	auto* pipeline = new Pipeline(GL_TRIANGLES, attributes,
+	                              *vertex_shader, *fragment_shader);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
-		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		graphics::clear(0.05f, 0.05f, 0.05f, 1.0f);
 
-		glUseProgram(program);
-		glBindVertexBuffer(0, vbo, 0, 7 * sizeof(float));
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, 0);
+		graphics::setPipeline(*pipeline);
+		graphics::setVertexBuffer(*vertex_buffer);
+		graphics::setIndexBuffer(*index_buffer, GL_UNSIGNED_SHORT);
+
+		graphics::draw(6);
 
 		glfwSwapBuffers(window);
 	}
+
+	delete pipeline;
+	delete fragment_shader;
+	delete vertex_shader;
+	delete index_buffer;
+	delete vertex_buffer;
+
+	graphics::shutdown();
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
