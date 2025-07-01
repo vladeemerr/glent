@@ -289,6 +289,7 @@ void setup(uint32_t width, uint32_t height) {
 
 		flat out vec4 out_color;
 		out vec2 out_uv;
+		out flat float out_size;
 
 		layout(std140, binding = 0) uniform Uniforms {
 			mat4 projected_view;
@@ -308,7 +309,8 @@ void setup(uint32_t width, uint32_t height) {
 
 			gl_Position = position;
 			out_color = point.color;
-			out_uv = in_position.xy;
+			out_uv = in_position.xy * point.position_size.w;
+			out_size = point.position_size.w + 0.5f;
 		}
 	)";
 
@@ -320,12 +322,13 @@ void setup(uint32_t width, uint32_t height) {
 
 		flat in vec4 out_color;
 		in vec2 out_uv;
+		flat in float out_size;
 
 		out vec4 frag_color;
 
 		void main() {
 			vec4 color = out_color;
-			color.a *= 1.0f - smoothstep(0.5f, 1.0f, length(out_uv));
+			color.a *= out_size - length(out_uv);
 
 			if (color.a <= 0.0f)
 				discard;
