@@ -6,7 +6,7 @@ struct Point {
 	vec4 color;
 };
 
-layout(location = 0) in vec4 in_position;
+layout(location = 0) in vec2 in_position;
 
 flat out vec4 out_color;
 out vec2 out_uv;
@@ -26,11 +26,11 @@ void main() {
 
 	vec4 position = projected_view * vec4(point.position_size.xyz, 1.0f);
 	vec2 size = point.position_size.w * one_over_viewport;
-	position.xy += in_position.xy * size * position.w;
+	position.xy += in_position * size * position.w;
 
 	gl_Position = position;
 	out_color = point.color;
-	out_uv = in_position.xy * point.position_size.w;
+	out_uv = in_position * point.position_size.w;
 	out_size = point.position_size.w + 0.5f;
 }
 )";
@@ -64,7 +64,7 @@ struct Point {
 	vec4 color;
 };
 
-layout(location = 0) in vec4 in_position;
+layout(location = 0) in vec2 in_position;
 
 out vec4 out_color;
 
@@ -98,6 +98,38 @@ void main() {
 )";
 
 constexpr char line_batch_fs_source[] = R"(
+#version 310 es
+precision mediump float;
+
+in vec4 out_color;
+
+out vec4 frag_color;
+
+void main() {
+	frag_color = out_color;
+}
+)";
+
+
+constexpr char polygon_batch_vs_source[] = R"(
+#version 310 es
+
+layout(location = 0) in vec4 in_position;
+layout(location = 1) in vec4 in_color;
+
+out vec4 out_color;
+
+layout(std140, binding = 0) uniform Uniforms {
+	mat4 projected_view;
+};
+
+void main() {
+	gl_Position = projected_view * vec4(in_position.xyz, 1.0f);
+	out_color = in_color;
+}
+)";
+
+constexpr char polygon_batch_fs_source[] = R"(
 #version 310 es
 precision mediump float;
 
