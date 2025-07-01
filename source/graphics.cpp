@@ -5,13 +5,29 @@
 #include <stdexcept>
 #include <sstream>
 
+#include <glm/ext/vector_float2.hpp>
+
 namespace glent::graphics {
 
 namespace {
 
+struct PointBatchUniforms {
+	glm::mat4 projected_view;
+	glm::vec2 one_over_viewport;
+};
+
 GLenum current_primitive_mode;
 GLintptr current_vertex_stride;
 GLenum current_index_type;
+
+uint32_t current_viewport_width;
+uint32_t current_viewport_height;
+
+Buffer* unit_quad_vertex_buffer;
+Buffer* point_batch_uniform_buffer;
+Shader* point_batch_vertex_shader;
+Shader* point_batch_fragment_shader;
+Pipeline* point_batch_pipeline;
 
 void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
                                 GLuint /*id*/, GLenum /*severity*/,
@@ -180,8 +196,11 @@ Pipeline::Pipeline(const PrimitiveState& primitive,
                    const VertexLayout layout,
                    const Shader& vertex_shader,
                    const Shader& fragment_shader,
-                   const DepthStencilState& depth_stencil)
-: primitive_state_{primitive}, depth_stencil_state_{depth_stencil} {
+                   const DepthStencilState& depth_stencil,
+                   const BlendState& blend_state)
+: primitive_state_{primitive},
+  depth_stencil_state_{depth_stencil},
+  blend_state_{blend_state} {
 	glGenVertexArrays(1, &vertex_array_);
 	glBindVertexArray(vertex_array_);
 
@@ -241,9 +260,106 @@ void setup(uint32_t width, uint32_t height) {
 	glDebugMessageCallbackKHR(glDebugCallback, 0);
 
 	glViewport(0, 0, width, height);
+
+	current_viewport_width = width;
+	current_viewport_height = height;
+
+	const float unit_quad_vertices[] = {
+		-1.0f, -1.0f, 0.0f, 1.0f,
+		1.0f, -1.0f, 0.0f, 1.0f,
+		-1.0f, 1.0f, 0.0f, 1.0f,
+		1.0f, 1.0f, 0.0f, 1.0f,
+	};
+
+	unit_quad_vertex_buffer = new Buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
+	                                     sizeof(unit_quad_vertices), unit_quad_vertices);
+
+	point_batch_uniform_buffer = new Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW,
+	                                        sizeof(PointBatchUniforms));
+
+	const char point_batch_vs_source[] = R"(
+		#version 310 es
+
+		struct Point {
+			vec4 position_size;
+			vec4 color;
+		};
+
+		layout(location = 0) in vec4 in_position;
+
+		flat out vec4 out_color;
+		out vec2 out_uv;
+
+		layout(std140, binding = 0) uniform Uniforms {
+			mat4 projected_view;
+			vec2 one_over_viewport;
+		};
+
+		layout(std430, binding = 1) readonly buffer Instances {
+			Point points[];
+		};
+
+		void main() {
+			Point point = points[gl_InstanceID];
+
+			vec4 position = projected_view * vec4(point.position_size.xyz, 1.0f);
+			vec2 size = point.position_size.w * one_over_viewport;
+			position.xy += in_position.xy * size * position.w;
+
+			gl_Position = position;
+			out_color = point.color;
+			out_uv = in_position.xy;
+		}
+	)";
+
+	point_batch_vertex_shader = new Shader(GL_VERTEX_SHADER, point_batch_vs_source);
+
+	const char point_batch_fs_source[] = R"(
+		#version 310 es
+		precision mediump float;
+
+		flat in vec4 out_color;
+		in vec2 out_uv;
+
+		out vec4 frag_color;
+
+		void main() {
+			vec4 color = out_color;
+			color.a *= 1.0f - smoothstep(0.5f, 1.0f, length(out_uv));
+
+			if (color.a <= 0.0f)
+				discard;
+
+			frag_color = color;
+		}
+	)";
+
+	point_batch_fragment_shader = new Shader(GL_FRAGMENT_SHADER, point_batch_fs_source);
+
+	const VertexAttribute point_batch_vertex_layout[] = {
+		{0, GL_FLOAT, 4, false},
+	};
+
+	point_batch_pipeline = new Pipeline(
+		PrimitiveState{.mode = GL_TRIANGLE_STRIP, .cull_mode = GL_NONE},
+		point_batch_vertex_layout,
+		*point_batch_vertex_shader,
+		*point_batch_fragment_shader,
+		DepthStencilState{.depth_write = false},
+		BlendState{
+			.enable = true,
+			.color_src_factor = GL_SRC_ALPHA,
+			.color_dst_factor = GL_ONE_MINUS_SRC_ALPHA,
+		});
 }
 
-void shutdown() {}
+void shutdown() {
+	delete point_batch_pipeline;
+	delete point_batch_fragment_shader;
+	delete point_batch_vertex_shader;
+	delete point_batch_uniform_buffer;
+	delete unit_quad_vertex_buffer;
+}
 
 void clear(float red, float green, float blue, float alpha) {
 	glClearColor(red, green, blue, alpha);
@@ -253,6 +369,7 @@ void clear(float red, float green, float blue, float alpha) {
 void setPipeline(const Pipeline& pipeline) {
 	const auto& primitive = pipeline.primitiveState();
 	const auto& depth_stencil = pipeline.depthStencilState();
+	const auto& blend = pipeline.blendState();
 	
 	current_primitive_mode = primitive.mode;
 	current_vertex_stride = pipeline.vertexStride();
@@ -271,6 +388,15 @@ void setPipeline(const Pipeline& pipeline) {
 		glDepthFunc(depth_stencil.depth_compare);
 	} else {
 		glDisable(GL_DEPTH_TEST);
+	}
+
+	if (blend.enable) {
+		glEnable(GL_BLEND);
+		glBlendFuncSeparate(blend.color_src_factor, blend.color_dst_factor,
+		                    blend.alpha_src_factor, blend.alpha_dst_factor);
+		glBlendEquationSeparate(blend.color_operation, blend.alpha_operation);
+	} else {
+		glDisable(GL_BLEND);
 	}
 
 	glUseProgram(pipeline.program());
@@ -324,6 +450,23 @@ void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset) {
 	} else {
 		glDrawArraysInstanced(current_primitive_mode, offset, count, instances);
 	}
+}
+
+void PointBatch::draw(const glm::mat4& projected_view) {
+	PointBatchUniforms uniforms{
+		projected_view,
+		1.0f / glm::vec2(current_viewport_width, current_viewport_height),
+	};
+	point_batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
+	
+	setPipeline(*point_batch_pipeline);
+	setVertexBuffer(*unit_quad_vertex_buffer);
+	setUniformBuffer(*point_batch_uniform_buffer, 0);
+	setStorageBuffer(points_, 1);
+
+	drawInstanced(size_, 4);
+
+	size_ = 0;
 }
 
 } // namespace glent::graphics

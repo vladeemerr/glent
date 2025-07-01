@@ -7,7 +7,17 @@
 
 #include <glad/gles2.h>
 
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
+#include <glm/ext/matrix_float4x4.hpp>
+
 namespace glent::graphics {
+
+struct Point {
+	glm::vec3 position;
+	float size;
+	glm::vec4 color;
+};
 
 struct VertexAttribute {
 	GLuint index;
@@ -29,6 +39,16 @@ struct DepthStencilState {
 	GLenum depth_compare = GL_LESS;
 	// TODO: Depth bias
 	// TODO: Stencil configuration
+};
+
+struct BlendState {
+	bool enable;
+	GLenum color_src_factor = GL_ONE;
+	GLenum color_dst_factor = GL_ZERO;
+	GLenum color_operation = GL_FUNC_ADD;
+	GLenum alpha_src_factor = GL_ONE;
+	GLenum alpha_dst_factor = GL_ZERO;
+	GLenum alpha_operation = GL_FUNC_ADD;
 };
 
 class Buffer final {
@@ -112,7 +132,7 @@ public:
 	};
 
 public:
-	Sampler(const Descriptor&);
+	explicit Sampler(const Descriptor&);
 	~Sampler();
 
 	Sampler(const Sampler&) = delete;
@@ -133,7 +153,8 @@ public:
 	         const VertexLayout layout,
 	         const Shader& vertex_shader,
 	         const Shader& fragment_shader,
-	         const DepthStencilState& depth_stencil);
+	         const DepthStencilState& depth_stencil,
+	         const BlendState& blend);
 	~Pipeline();
 
 	Pipeline(const Pipeline&) = delete;
@@ -144,6 +165,7 @@ public:
 
 	const PrimitiveState& primitiveState() const & noexcept { return primitive_state_; }
 	const DepthStencilState& depthStencilState() const & noexcept { return depth_stencil_state_; }
+	const BlendState& blendState() const & noexcept { return blend_state_; }
 	GLintptr vertexStride() const noexcept { return vertex_stride_; }
 
 	GLuint vertexArray() const noexcept { return vertex_array_; }
@@ -152,10 +174,41 @@ public:
 private:
 	const PrimitiveState primitive_state_;
 	const DepthStencilState depth_stencil_state_;
+	const BlendState blend_state_;
 	GLintptr vertex_stride_ = 0;
 
 	GLuint vertex_array_;
 	GLuint program_;
+};
+
+class PointBatch final {
+public:
+	explicit PointBatch(size_t capacity)
+	: capacity_{capacity},
+	  points_(GL_SHADER_STORAGE_BUFFER, GL_DYNAMIC_DRAW,
+	          capacity * sizeof(Point)) {}
+	~PointBatch() = default;
+
+	PointBatch(const PointBatch&) = delete;
+	PointBatch(PointBatch&&) noexcept = delete;
+
+	PointBatch& operator=(const PointBatch&) = delete;
+	PointBatch& operator=(PointBatch&&) noexcept = delete;
+
+	void append(const std::span<const Point> points) {
+		// TODO: Prevent overflow
+		size_t count = points.size();
+		points_.assign(count * sizeof(Point), points.data(),
+		               size_ * sizeof(Point));
+		size_ += count;
+	}
+
+	void draw(const glm::mat4& projected_view);
+
+private:
+	size_t size_ = 0;
+	size_t capacity_;
+	Buffer points_;
 };
 
 void setup(uint32_t width, uint32_t height);

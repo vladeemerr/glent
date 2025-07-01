@@ -54,98 +54,15 @@ int main() {
 	glfwSwapInterval(1);
 
 	graphics::setup(window_default_width, window_default_height);
-	using graphics::Buffer;
-	using graphics::Shader;
-	using graphics::Texture;
-	using graphics::Sampler;
-	using graphics::VertexAttribute;
-	using graphics::Pipeline;
+	using graphics::PointBatch;
+	using graphics::Point;
 
-	const float vertices[] = {
-		-1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-		1.0f, -1.0f, 0.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-		1.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+	auto* point_batch = new PointBatch(16);
+	std::vector<Point> points{
+		{{-1.0f, -1.0f, 0.0f}, 16.0f, {1.0f, 0.5f, 0.5f, 1.0f}},
+		{{1.0f, -1.0f, 0.0f}, 16.0f, {0.5f, 1.0f, 0.5f, 1.0f}},
+		{{0.0f, 1.0f, 0.0f}, 16.0f, {0.5f, 0.5f, 1.0f, 1.0f}},
 	};
-
-	auto* vertex_buffer = new Buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
-	                                 sizeof(vertices), vertices);
-
-	const uint16_t indices[] = {0, 1, 2, 1, 3, 2};
-
-	auto* index_buffer = new Buffer(GL_ELEMENT_ARRAY_BUFFER, GL_STATIC_DRAW,
-	                                sizeof(indices), indices);
-
-	struct {
-		glm::mat4 projected_view;
-	} uniforms;
-
-	auto* uniform_buffer = new Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW, sizeof(uniforms));
-
-	std::array<glm::mat4, 16> transforms;
-
-	auto* storage_buffer = new Buffer(GL_SHADER_STORAGE_BUFFER, GL_DYNAMIC_DRAW,
-	                                  transforms.size() * sizeof(glm::mat4));
-
-	std::vector<uint8_t> texture_data;
-	uint32_t texture_width, texture_height;
-	lodepng::decode(texture_data, texture_width, texture_height, "assets/texture.png");
-
-	auto* texture = new Texture(GL_RGBA8, texture_width, texture_height,
-	                            texture_data.data());
-
-	auto* sampler = new Sampler({});
-
-	const char vs_src[] = R"(
-		#version 310 es
-
-		layout(location = 0) in vec3 in_position;
-		layout(location = 1) in vec2 in_texcoord;
-
-		out vec2 out_texcoord;
-
-		layout(std140, binding = 0) uniform Constants {
-			mat4 projected_view;
-		};
-
-		layout(std430, binding = 1) readonly buffer Instances {
-			mat4 transforms[];
-		};
-
-		void main() {
-			mat4 model = transforms[gl_InstanceID];
-			gl_Position = projected_view * model * vec4(in_position, 1.0f);
-			out_texcoord = in_texcoord;
-		}
-	)";
-
-	auto* vertex_shader = new Shader(GL_VERTEX_SHADER, vs_src);
-
-	const char fs_src[] = R"(
-		#version 310 es
-		precision mediump float;
-
-		in vec2 out_texcoord;
-
-		out vec4 frag_color;
-
-		layout(binding = 0) uniform sampler2D texture_0;
-
-		void main() {
-			frag_color = texture(texture_0, out_texcoord);
-		}
-	)";
-
-	auto* fragment_shader = new Shader(GL_FRAGMENT_SHADER, fs_src);
-
-	const VertexAttribute attributes[] = {
-		{0, GL_FLOAT, 3, false},
-		{1, GL_FLOAT, 2, false},
-	};
-
-	auto* pipeline = new Pipeline(graphics::PrimitiveState{GL_TRIANGLES}, attributes,
-	                              *vertex_shader, *fragment_shader,
-	                              graphics::DepthStencilState{.depth_write = true});
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -153,45 +70,22 @@ int main() {
 		float t = float(glfwGetTime());
 
 		auto projection = glm::perspectiveLH(
-			glm::radians(75.0f), float(window_default_width) / window_default_height,
+			glm::radians(75.0f),
+			float(window_default_width) / window_default_height,
 			0.001f, 1000.0f);
-		auto view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
+		auto view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f + 3.0f * glm::cos(t)));
 
-		uniforms.projected_view = projection * glm::inverse(view);
-		uniform_buffer->assign(sizeof(uniforms), &uniforms);
-
-		for (size_t i = 0, e = transforms.size(); i != e; ++i) {
-			auto& m = transforms[i];
-			auto r = t + (2.0f * glm::pi<float>() * i) / e;
-			m = glm::translate(glm::mat4(1.0f),
-			                   glm::vec3(3.0f * glm::cos(r), 2.0f * glm::sin(r),
-			                             3.0f * glm::cos(r) * glm::sin(r)));
-		}
-		storage_buffer->assign(transforms.size() * sizeof(glm::mat4), transforms.data());
+		auto projected_view = projection * glm::inverse(view);
 
 		graphics::clear(0.05f, 0.05f, 0.05f, 1.0f);
 
-		graphics::setPipeline(*pipeline);
-		graphics::setVertexBuffer(*vertex_buffer);
-		graphics::setIndexBuffer(*index_buffer, GL_UNSIGNED_SHORT);
-		graphics::setUniformBuffer(*uniform_buffer, 0);
-		graphics::setStorageBuffer(*storage_buffer, 1);
-		graphics::setTexture(*texture, *sampler, 0);
-
-		graphics::drawInstanced(transforms.size(), 6);
+		point_batch->append(points);
+		point_batch->draw(projected_view);
 
 		glfwSwapBuffers(window);
 	}
 
-	delete pipeline;
-	delete fragment_shader;
-	delete vertex_shader;
-	delete sampler;
-	delete texture;
-	delete storage_buffer;
-	delete uniform_buffer;
-	delete index_buffer;
-	delete vertex_buffer;
+	delete point_batch;
 
 	graphics::shutdown();
 
