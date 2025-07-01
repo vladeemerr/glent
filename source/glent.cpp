@@ -54,14 +54,25 @@ int main() {
 	glfwSwapInterval(1);
 
 	graphics::setup(window_default_width, window_default_height);
-	using graphics::PointBatch;
 	using graphics::Point;
+	using graphics::PointBatch;
+	using graphics::LineBatch;
 
 	auto* point_batch = new PointBatch(16);
 	std::vector<Point> points{
 		{{-1.0f, -1.0f, 0.0f}, 16.0f, {1.0f, 0.5f, 0.5f, 1.0f}},
 		{{1.0f, -1.0f, 0.0f}, 16.0f, {0.5f, 1.0f, 0.5f, 1.0f}},
 		{{0.0f, 1.0f, 0.0f}, 16.0f, {0.5f, 0.5f, 1.0f, 1.0f}},
+	};
+
+	auto* line_batch = new LineBatch(16);
+	std::vector<Point> line_points{
+		{{-1.0f, -1.0f, 0.0f}, 16.0f, {1.0f, 0.5f, 0.5f, 1.0f}},
+		{{1.0f, -1.0f, 0.0f}, 16.0f, {0.5f, 1.0f, 0.5f, 1.0f}},
+		{{1.0f, -1.0f, 0.0f}, 16.0f, {0.5f, 1.0f, 0.5f, 1.0f}},
+		{{0.0f, 1.0f, 0.0f}, 16.0f, {0.5f, 0.5f, 1.0f, 1.0f}},
+		{{0.0f, 1.0f, 0.0f}, 16.0f, {0.5f, 0.5f, 1.0f, 1.0f}},
+		{{-1.0f, -1.0f, 0.0f}, 16.0f, {1.0f, 0.5f, 0.5f, 1.0f}},
 	};
 
 	while (!glfwWindowShouldClose(window)) {
@@ -81,6 +92,9 @@ int main() {
 
 		point_batch->append(points);
 		point_batch->draw(projected_view);
+
+		line_batch->append(line_points);
+		line_batch->draw(projected_view);
 
 		glfwSwapBuffers(window);
 	}

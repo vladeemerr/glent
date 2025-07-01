@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string_view>
 #include <span>
+#include <algorithm>
 
 #include <glad/gles2.h>
 
@@ -195,12 +196,52 @@ public:
 	PointBatch& operator=(const PointBatch&) = delete;
 	PointBatch& operator=(PointBatch&&) noexcept = delete;
 
-	void append(const std::span<const Point> points) {
-		// TODO: Prevent overflow
-		size_t count = points.size();
+	size_t append(const std::span<const Point> points) {
+		size_t count = std::min(points.size(), capacity_ - size_);
+
+		if (count == 0)
+			return 0;
+
 		points_.assign(count * sizeof(Point), points.data(),
 		               size_ * sizeof(Point));
 		size_ += count;
+
+		return count;
+	}
+
+	void draw(const glm::mat4& projected_view);
+
+private:
+	size_t size_ = 0;
+	size_t capacity_;
+	Buffer points_;
+};
+
+class LineBatch final {
+public:
+	explicit LineBatch(size_t capacity)
+	: capacity_{capacity},
+	  points_(GL_SHADER_STORAGE_BUFFER, GL_DYNAMIC_DRAW,
+	          2 * capacity * sizeof(Point)) {}
+	~LineBatch() = default;
+
+	LineBatch(const LineBatch&) = delete;
+	LineBatch(LineBatch&&) noexcept = delete;
+
+	LineBatch& operator=(const LineBatch&) = delete;
+	LineBatch& operator=(LineBatch&&) noexcept = delete;
+
+	size_t append(const std::span<const Point> points) {
+		size_t count = std::min(points.size(), capacity_ - size_);
+
+		if (count == 0)
+			return 0;
+
+		points_.assign(count * sizeof(Point), points.data(),
+		               size_ * sizeof(Point));
+		size_ += count;
+
+		return count;
 	}
 
 	void draw(const glm::mat4& projected_view);

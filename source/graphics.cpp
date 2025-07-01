@@ -11,7 +11,7 @@ namespace glent::graphics {
 
 namespace {
 
-struct PointBatchUniforms {
+struct BatchUniforms {
 	glm::mat4 projected_view;
 	glm::vec2 one_over_viewport;
 };
@@ -24,10 +24,15 @@ uint32_t current_viewport_width;
 uint32_t current_viewport_height;
 
 Buffer* unit_quad_vertex_buffer;
-Buffer* point_batch_uniform_buffer;
+Buffer* batch_uniform_buffer;
+
 Shader* point_batch_vertex_shader;
 Shader* point_batch_fragment_shader;
 Pipeline* point_batch_pipeline;
+
+Shader* line_batch_vertex_shader;
+Shader* line_batch_fragment_shader;
+Pipeline* line_batch_pipeline;
 
 void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
                                 GLuint /*id*/, GLenum /*severity*/,
@@ -274,8 +279,8 @@ void setup(uint32_t width, uint32_t height) {
 	unit_quad_vertex_buffer = new Buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
 	                                     sizeof(unit_quad_vertices), unit_quad_vertices);
 
-	point_batch_uniform_buffer = new Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW,
-	                                        sizeof(PointBatchUniforms));
+	batch_uniform_buffer = new Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW,
+	                                  sizeof(BatchUniforms));
 
 	const char point_batch_vs_source[] = R"(
 		#version 310 es
@@ -339,28 +344,110 @@ void setup(uint32_t width, uint32_t height) {
 
 	point_batch_fragment_shader = new Shader(GL_FRAGMENT_SHADER, point_batch_fs_source);
 
-	const VertexAttribute point_batch_vertex_layout[] = {
+	const char line_batch_vs_source[] = R"(
+		#version 310 es
+
+		struct Point {
+			vec4 position_size;
+			vec4 color;
+		};
+
+		layout(location = 0) in vec4 in_position;
+
+		out vec4 out_color;
+
+		layout(std140, binding = 0) uniform Uniforms {
+			mat4 projected_view;
+			vec2 one_over_viewport;
+		};
+
+		layout(std430, binding = 1) readonly buffer Instances {
+			Point points[];
+		};
+
+		void main() {
+			Point point = points[2 * gl_InstanceID + (gl_VertexID & 1)];
+
+			vec4 positions[2];
+			positions[0] = projected_view * vec4(points[2 * gl_InstanceID].position_size.xyz, 1.0f);
+			positions[1] = projected_view * vec4(points[2 * gl_InstanceID + 1].position_size.xyz, 1.0f);
+
+			vec2 dir = normalize((positions[0].xy / positions[0].w) -
+			                     (positions[1].xy / positions[1].w));
+			vec2 perp = vec2(-dir.y, dir.x);
+
+			vec4 position = positions[gl_VertexID & 1];
+			position.xy += perp * in_position.y * position.w *
+			               point.position_size.w * one_over_viewport;
+
+			gl_Position = position;
+			out_color = point.color;
+		}
+	)";
+
+	line_batch_vertex_shader = new Shader(GL_VERTEX_SHADER, line_batch_vs_source);
+
+	const char line_batch_fs_source[] = R"(
+		#version 310 es
+		precision mediump float;
+
+		in vec4 out_color;
+
+		out vec4 frag_color;
+
+		void main() {
+			frag_color = out_color;
+		}
+	)";
+
+	line_batch_fragment_shader = new Shader(GL_FRAGMENT_SHADER, line_batch_fs_source);
+
+	const PrimitiveState batch_primitive_state{
+		.mode = GL_TRIANGLE_STRIP,
+		.cull_mode = GL_NONE,
+	};
+
+	const VertexAttribute batch_vertex_layout[] = {
 		{0, GL_FLOAT, 4, false},
 	};
 
+	const DepthStencilState batch_depth_stencil_state{
+		.depth_write = false,
+	};
+
+	const BlendState batch_blend_state{
+		.enable = true,
+		.color_src_factor = GL_SRC_ALPHA,
+		.color_dst_factor = GL_ONE_MINUS_SRC_ALPHA,
+	};
+
 	point_batch_pipeline = new Pipeline(
-		PrimitiveState{.mode = GL_TRIANGLE_STRIP, .cull_mode = GL_NONE},
-		point_batch_vertex_layout,
+		batch_primitive_state,
+		batch_vertex_layout,
 		*point_batch_vertex_shader,
 		*point_batch_fragment_shader,
-		DepthStencilState{.depth_write = false},
-		BlendState{
-			.enable = true,
-			.color_src_factor = GL_SRC_ALPHA,
-			.color_dst_factor = GL_ONE_MINUS_SRC_ALPHA,
-		});
+		batch_depth_stencil_state,
+		batch_blend_state);
+
+	line_batch_pipeline = new Pipeline(
+		batch_primitive_state,
+		batch_vertex_layout,
+		*line_batch_vertex_shader,
+		*line_batch_fragment_shader,
+		batch_depth_stencil_state,
+		batch_blend_state);
 }
 
 void shutdown() {
+	delete line_batch_pipeline;
+	delete line_batch_fragment_shader;
+	delete line_batch_vertex_shader;
+
 	delete point_batch_pipeline;
 	delete point_batch_fragment_shader;
 	delete point_batch_vertex_shader;
-	delete point_batch_uniform_buffer;
+
+	delete batch_uniform_buffer;
 	delete unit_quad_vertex_buffer;
 }
 
@@ -456,18 +543,37 @@ void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset) {
 }
 
 void PointBatch::draw(const glm::mat4& projected_view) {
-	PointBatchUniforms uniforms{
+	BatchUniforms uniforms{
 		projected_view,
 		1.0f / glm::vec2(current_viewport_width, current_viewport_height),
 	};
-	point_batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
+	batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
 	
 	setPipeline(*point_batch_pipeline);
 	setVertexBuffer(*unit_quad_vertex_buffer);
-	setUniformBuffer(*point_batch_uniform_buffer, 0);
+	setUniformBuffer(*batch_uniform_buffer, 0);
 	setStorageBuffer(points_, 1);
 
 	drawInstanced(size_, 4);
+
+	size_ = 0;
+}
+
+void LineBatch::draw(const glm::mat4& projected_view) {
+	assert(size_ % 2 == 0);
+
+	BatchUniforms uniforms{
+		projected_view,
+		1.0f / glm::vec2(current_viewport_width, current_viewport_height),
+	};
+	batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
+	
+	setPipeline(*line_batch_pipeline);
+	setVertexBuffer(*unit_quad_vertex_buffer);
+	setUniformBuffer(*batch_uniform_buffer, 0);
+	setStorageBuffer(points_, 1);
+
+	drawInstanced(size_ / 2, 4);
 
 	size_ = 0;
 }
