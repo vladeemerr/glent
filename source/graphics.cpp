@@ -42,6 +42,29 @@ inline GLsizei sizeFromType(GLenum type) {
 	return 0;
 }
 
+inline GLenum formatFromInternalFormat(GLenum format) {
+	switch (format) {
+		case GL_R8: return GL_RED;
+		case GL_RG8: return GL_RG;
+		case GL_RGB8: return GL_RGB;
+		case GL_RGBA8: return GL_RGBA;
+	}
+
+	return 0;
+}
+
+inline GLenum typeFromInternalFormat(GLenum format) {
+	switch (format) {
+		case GL_R8:
+		case GL_RG8:
+		case GL_RGB8:
+		case GL_RGBA8:
+			return GL_UNSIGNED_BYTE;
+	}
+
+	return 0;
+}
+
 } // namespace
 
 Buffer::Buffer(GLenum type, GLenum usage, size_t size, const void* data)
@@ -111,6 +134,46 @@ Shader::Shader(GLenum type, const std::string_view source) {
 
 Shader::~Shader() {
 	glDeleteShader(handle_);
+}
+
+Texture::Texture(GLenum format, uint32_t width, uint32_t height, const void* data)
+: type_{GL_TEXTURE_2D}, format_{format} {
+	assert(width != 0 && height != 0);
+	
+	glGenTextures(1, &handle_);
+	glBindTexture(GL_TEXTURE_2D, handle_);
+
+	glTexStorage2D(GL_TEXTURE_2D, 1, format, width, height);
+
+	if (data != nullptr) {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
+		                formatFromInternalFormat(format),
+		                typeFromInternalFormat(format),
+		                data);
+	}
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+Texture::~Texture() {
+	glDeleteTextures(1, &handle_);
+}
+
+Sampler::Sampler(const Descriptor& descriptor) {
+	glGenSamplers(1, &handle_);
+
+	glSamplerParameteri(handle_, GL_TEXTURE_WRAP_S, descriptor.address_mode_u);
+	glSamplerParameteri(handle_, GL_TEXTURE_WRAP_T, descriptor.address_mode_v);
+	glSamplerParameteri(handle_, GL_TEXTURE_WRAP_R, descriptor.address_mode_w);
+	glSamplerParameteri(handle_, GL_TEXTURE_MIN_FILTER, descriptor.min_filter);
+	glSamplerParameteri(handle_, GL_TEXTURE_MAG_FILTER, descriptor.mag_filter);
+	glSamplerParameteri(handle_, GL_TEXTURE_MIN_LOD, descriptor.min_lod);
+	glSamplerParameteri(handle_, GL_TEXTURE_MAX_LOD, descriptor.max_lod);
+	glSamplerParameteri(handle_, GL_TEXTURE_COMPARE_FUNC, descriptor.compare_func);
+}
+
+Sampler::~Sampler() {
+	glDeleteSamplers(1, &handle_);
 }
 
 Pipeline::Pipeline(const PrimitiveState& primitive,
@@ -236,6 +299,12 @@ void setUniformBuffer(const Buffer& buffer, uint32_t binding) {
 void setStorageBuffer(const Buffer& buffer, uint32_t binding) {
 	assert(buffer.type() == GL_SHADER_STORAGE_BUFFER);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, buffer.handle());
+}
+
+void setTexture(const Texture& texture, const Sampler& sampler, uint32_t binding) {
+	glActiveTexture(GL_TEXTURE0 + binding);
+	glBindSampler(binding, sampler.handle());
+	glBindTexture(texture.type(), texture.handle());
 }
 
 void draw(uint32_t count, uint32_t offset) {

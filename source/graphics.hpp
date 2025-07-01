@@ -76,6 +76,57 @@ private:
 	GLenum handle_;
 };
 
+class Texture final {
+public:
+	Texture(GLenum format, uint32_t width, uint32_t height,
+	        const void* data = nullptr);
+	~Texture();
+
+	Texture(const Texture&) = delete;
+	Texture(Texture&&) noexcept = delete;
+
+	Texture& operator=(const Texture&) = delete;
+	Texture& operator=(Texture&&) noexcept = delete;
+
+	GLenum type() const noexcept { return type_; }
+	GLuint handle() const noexcept { return handle_; }
+
+private:
+	GLenum type_;
+	GLenum format_;
+	
+	GLuint handle_;
+};
+
+class Sampler final {
+public:
+	struct Descriptor {
+		GLenum address_mode_u = GL_CLAMP_TO_EDGE;
+		GLenum address_mode_v = GL_CLAMP_TO_EDGE;
+		GLenum address_mode_w = GL_CLAMP_TO_EDGE;
+		GLenum min_filter = GL_NEAREST;
+		GLenum mag_filter = GL_LINEAR;
+		GLenum min_lod = -1000;
+		GLenum max_lod = 1000;
+		GLenum compare_func = GL_NEVER;
+	};
+
+public:
+	Sampler(const Descriptor&);
+	~Sampler();
+
+	Sampler(const Sampler&) = delete;
+	Sampler(Sampler&&) noexcept = delete;
+
+	Sampler& operator=(const Sampler&) = delete;
+	Sampler& operator=(Sampler&&) noexcept = delete;
+
+	GLuint handle() const noexcept { return handle_; }
+
+private:
+	GLuint handle_;
+};
+
 class Pipeline final {
 public:
 	Pipeline(const PrimitiveState& primitive,
@@ -117,6 +168,7 @@ void setVertexBuffer(const Buffer&);
 void setIndexBuffer(const Buffer&, GLenum index_type);
 void setUniformBuffer(const Buffer&, uint32_t binding);
 void setStorageBuffer(const Buffer&, uint32_t binding);
+void setTexture(const Texture&, const Sampler&, uint32_t binding);
 
 void draw(uint32_t count, uint32_t offset = 0);
 void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset = 0);

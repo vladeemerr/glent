@@ -34,6 +34,11 @@ FetchContent_Declare(
 	GIT_REPOSITORY https://github.com/g-truc/glm
 )
 
+FetchContent_Declare(
+	lodepng
+	GIT_REPOSITORY https://github.com/lvandeve/lodepng
+)
+
 set(GLFW_LIBRARY_TYPE STATIC)
 set(GLFW_BUILD_EXAMPLES OFF)
 set(GLFW_BUILD_TESTS OFF)
@@ -41,8 +46,10 @@ set(GLFW_BUILD_DOCS OFF)
 
 set(GLM_BUILD_TESTS OFF)
 
-FetchContent_MakeAvailable(glfw glad glm)
+FetchContent_MakeAvailable(glfw glad glm lodepng)
 
 glad_add_library(glad STATIC API gles2=3.1 EXTENSIONS GL_KHR_debug)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad glm::glm)
+target_sources(${PROJECT_NAME} PRIVATE ${lodepng_SOURCE_DIR}/lodepng.cpp)
+target_include_directories(${PROJECT_NAME} PRIVATE ${lodepng_SOURCE_DIR})

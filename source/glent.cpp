@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <iostream>
 #include <array>
+#include <vector>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -8,6 +9,8 @@
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+
+#include <lodepng.h>
 
 #include "graphics.hpp"
 using namespace glent;
@@ -53,14 +56,16 @@ int main() {
 	graphics::setup(window_default_width, window_default_height);
 	using graphics::Buffer;
 	using graphics::Shader;
+	using graphics::Texture;
+	using graphics::Sampler;
 	using graphics::VertexAttribute;
 	using graphics::Pipeline;
 
 	const float vertices[] = {
-		-1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-		1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-		-1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
+		1.0f, -1.0f, 0.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+		1.0f, 1.0f, 0.0f, 1.0f, 0.0f,
 	};
 
 	auto* vertex_buffer = new Buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
@@ -82,13 +87,22 @@ int main() {
 	auto* storage_buffer = new Buffer(GL_SHADER_STORAGE_BUFFER, GL_DYNAMIC_DRAW,
 	                                  transforms.size() * sizeof(glm::mat4));
 
+	std::vector<uint8_t> texture_data;
+	uint32_t texture_width, texture_height;
+	lodepng::decode(texture_data, texture_width, texture_height, "assets/texture.png");
+
+	auto* texture = new Texture(GL_RGBA8, texture_width, texture_height,
+	                            texture_data.data());
+
+	auto* sampler = new Sampler({});
+
 	const char vs_src[] = R"(
 		#version 310 es
 
 		layout(location = 0) in vec3 in_position;
-		layout(location = 1) in vec4 in_color;
+		layout(location = 1) in vec2 in_texcoord;
 
-		out vec4 out_color;
+		out vec2 out_texcoord;
 
 		layout(std140, binding = 0) uniform Constants {
 			mat4 projected_view;
@@ -101,7 +115,7 @@ int main() {
 		void main() {
 			mat4 model = transforms[gl_InstanceID];
 			gl_Position = projected_view * model * vec4(in_position, 1.0f);
-			out_color = in_color;
+			out_texcoord = in_texcoord;
 		}
 	)";
 
@@ -111,12 +125,14 @@ int main() {
 		#version 310 es
 		precision mediump float;
 
-		in vec4 out_color;
+		in vec2 out_texcoord;
 
 		out vec4 frag_color;
 
+		layout(binding = 0) uniform sampler2D texture_0;
+
 		void main() {
-			frag_color = out_color;
+			frag_color = texture(texture_0, out_texcoord);
 		}
 	)";
 
@@ -124,7 +140,7 @@ int main() {
 
 	const VertexAttribute attributes[] = {
 		{0, GL_FLOAT, 3, false},
-		{1, GL_FLOAT, 4, false},
+		{1, GL_FLOAT, 2, false},
 	};
 
 	auto* pipeline = new Pipeline(graphics::PrimitiveState{GL_TRIANGLES}, attributes,
@@ -160,6 +176,7 @@ int main() {
 		graphics::setIndexBuffer(*index_buffer, GL_UNSIGNED_SHORT);
 		graphics::setUniformBuffer(*uniform_buffer, 0);
 		graphics::setStorageBuffer(*storage_buffer, 1);
+		graphics::setTexture(*texture, *sampler, 0);
 
 		graphics::drawInstanced(transforms.size(), 6);
 
@@ -169,6 +186,8 @@ int main() {
 	delete pipeline;
 	delete fragment_shader;
 	delete vertex_shader;
+	delete sampler;
+	delete texture;
 	delete storage_buffer;
 	delete uniform_buffer;
 	delete index_buffer;
