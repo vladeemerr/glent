@@ -9,7 +9,7 @@ namespace glent::graphics {
 
 namespace {
 
-GLenum current_drawing_mode;
+GLenum current_primitive_mode;
 GLintptr current_vertex_stride;
 GLenum current_index_type;
 
@@ -48,7 +48,8 @@ Buffer::Buffer(GLenum type, GLenum usage, size_t size, const void* data)
 : type_{type}, usage_{usage}, size_{size} {
 	assert(type == GL_ARRAY_BUFFER ||
 	       type == GL_ELEMENT_ARRAY_BUFFER ||
-	       type == GL_UNIFORM_BUFFER);
+	       type == GL_UNIFORM_BUFFER ||
+	       type == GL_SHADER_STORAGE_BUFFER);
 	assert(usage == GL_STATIC_DRAW || usage == GL_DYNAMIC_DRAW);
 	assert(size != 0);
 	assert(usage != GL_STATIC_DRAW || data != nullptr);
@@ -190,9 +191,9 @@ void setPipeline(const Pipeline& pipeline) {
 	const auto& primitive = pipeline.primitiveState();
 	const auto& depth_stencil = pipeline.depthStencilState();
 	
-	current_drawing_mode = primitive.mode;
+	current_primitive_mode = primitive.mode;
 	current_vertex_stride = pipeline.vertexStride();
-	current_index_type = 0;
+	current_index_type = GL_NONE;
 
 	if (primitive.cull_mode != GL_NONE) {
 		glEnable(GL_CULL_FACE);
@@ -229,15 +230,30 @@ void setIndexBuffer(const Buffer& buffer, GLenum index_type) {
 
 void setUniformBuffer(const Buffer& buffer, uint32_t binding) {
 	assert(buffer.type() == GL_UNIFORM_BUFFER);
-	glBindBufferBase(buffer.type(), binding, buffer.handle());
+	glBindBufferBase(GL_UNIFORM_BUFFER, binding, buffer.handle());
+}
+
+void setStorageBuffer(const Buffer& buffer, uint32_t binding) {
+	assert(buffer.type() == GL_SHADER_STORAGE_BUFFER);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, buffer.handle());
 }
 
 void draw(uint32_t count, uint32_t offset) {
-	if (current_index_type != 0) {
-		glDrawElements(current_drawing_mode, count, current_index_type,
+	if (current_index_type != GL_NONE) {
+		glDrawElements(current_primitive_mode, count, current_index_type,
 		               reinterpret_cast<const void*>(offset * sizeFromType(current_index_type)));
 	} else {
-		glDrawArrays(current_drawing_mode, offset, count);
+		glDrawArrays(current_primitive_mode, offset, count);
+	}
+}
+
+void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset) {
+	if (current_index_type != GL_NONE) {
+		glDrawElementsInstanced(current_primitive_mode, count, current_index_type,
+		                        reinterpret_cast<const void*>(offset * sizeFromType(current_index_type)),
+		                        instances);
+	} else {
+		glDrawArraysInstanced(current_primitive_mode, offset, count, instances);
 	}
 }
 

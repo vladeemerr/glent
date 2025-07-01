@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <iostream>
+#include <array>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -72,10 +73,14 @@ int main() {
 
 	struct {
 		glm::mat4 projected_view;
-		glm::mat4 model;
 	} uniforms;
 
 	auto* uniform_buffer = new Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW, sizeof(uniforms));
+
+	std::array<glm::mat4, 16> transforms;
+
+	auto* storage_buffer = new Buffer(GL_SHADER_STORAGE_BUFFER, GL_DYNAMIC_DRAW,
+	                                  transforms.size() * sizeof(glm::mat4));
 
 	const char vs_src[] = R"(
 		#version 310 es
@@ -85,12 +90,16 @@ int main() {
 
 		out vec4 out_color;
 
-		layout(std140, binding = 0) uniform constants {
+		layout(std140, binding = 0) uniform Constants {
 			mat4 projected_view;
-			mat4 model;
+		};
+
+		layout(std430, binding = 1) readonly buffer Instances {
+			mat4 transforms[];
 		};
 
 		void main() {
+			mat4 model = transforms[gl_InstanceID];
 			gl_Position = projected_view * model * vec4(in_position, 1.0f);
 			out_color = in_color;
 		}
@@ -133,8 +142,16 @@ int main() {
 		auto view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
 
 		uniforms.projected_view = projection * glm::inverse(view);
-		uniforms.model = glm::rotate(glm::mat4(1.0f), t, glm::vec3(0.0f, 1.0f, 0.0f));
 		uniform_buffer->assign(sizeof(uniforms), &uniforms);
+
+		for (size_t i = 0, e = transforms.size(); i != e; ++i) {
+			auto& m = transforms[i];
+			auto r = t + (2.0f * glm::pi<float>() * i) / e;
+			m = glm::translate(glm::mat4(1.0f),
+			                   glm::vec3(3.0f * glm::cos(r), 2.0f * glm::sin(r),
+			                             3.0f * glm::cos(r) * glm::sin(r)));
+		}
+		storage_buffer->assign(transforms.size() * sizeof(glm::mat4), transforms.data());
 
 		graphics::clear(0.05f, 0.05f, 0.05f, 1.0f);
 
@@ -142,8 +159,9 @@ int main() {
 		graphics::setVertexBuffer(*vertex_buffer);
 		graphics::setIndexBuffer(*index_buffer, GL_UNSIGNED_SHORT);
 		graphics::setUniformBuffer(*uniform_buffer, 0);
+		graphics::setStorageBuffer(*storage_buffer, 1);
 
-		graphics::draw(6);
+		graphics::drawInstanced(transforms.size(), 6);
 
 		glfwSwapBuffers(window);
 	}
@@ -151,6 +169,7 @@ int main() {
 	delete pipeline;
 	delete fragment_shader;
 	delete vertex_shader;
+	delete storage_buffer;
 	delete uniform_buffer;
 	delete index_buffer;
 	delete vertex_buffer;

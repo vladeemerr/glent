@@ -116,7 +116,9 @@ void setPipeline(const Pipeline&);
 void setVertexBuffer(const Buffer&);
 void setIndexBuffer(const Buffer&, GLenum index_type);
 void setUniformBuffer(const Buffer&, uint32_t binding);
+void setStorageBuffer(const Buffer&, uint32_t binding);
 
 void draw(uint32_t count, uint32_t offset = 0);
+void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset = 0);
 
 } // namespace glent::graphics
