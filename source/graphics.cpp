@@ -46,7 +46,9 @@ inline GLsizei sizeFromType(GLenum type) {
 
 Buffer::Buffer(GLenum type, GLenum usage, size_t size, const void* data)
 : type_{type}, usage_{usage}, size_{size} {
-	assert(type == GL_ARRAY_BUFFER || type == GL_ELEMENT_ARRAY_BUFFER);
+	assert(type == GL_ARRAY_BUFFER ||
+	       type == GL_ELEMENT_ARRAY_BUFFER ||
+	       type == GL_UNIFORM_BUFFER);
 	assert(usage == GL_STATIC_DRAW || usage == GL_DYNAMIC_DRAW);
 	assert(size != 0);
 	assert(usage != GL_STATIC_DRAW || data != nullptr);
@@ -110,11 +112,12 @@ Shader::~Shader() {
 	glDeleteShader(handle_);
 }
 
-Pipeline::Pipeline(GLenum drawing_mode,
+Pipeline::Pipeline(const PrimitiveState& primitive,
                    const VertexLayout layout,
                    const Shader& vertex_shader,
-                   const Shader& fragment_shader)
-: drawing_mode_{drawing_mode} {
+                   const Shader& fragment_shader,
+                   const DepthStencilState& depth_stencil)
+: primitive_state_{primitive}, depth_stencil_state_{depth_stencil} {
 	glGenVertexArrays(1, &vertex_array_);
 	glBindVertexArray(vertex_array_);
 
@@ -180,13 +183,31 @@ void shutdown() {}
 
 void clear(float red, float green, float blue, float alpha) {
 	glClearColor(red, green, blue, alpha);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void setPipeline(const Pipeline& pipeline) {
-	current_drawing_mode = pipeline.drawingMode();
+	const auto& primitive = pipeline.primitiveState();
+	const auto& depth_stencil = pipeline.depthStencilState();
+	
+	current_drawing_mode = primitive.mode;
 	current_vertex_stride = pipeline.vertexStride();
 	current_index_type = 0;
+
+	if (primitive.cull_mode != GL_NONE) {
+		glEnable(GL_CULL_FACE);
+		glCullFace(primitive.cull_mode);
+		glFrontFace(primitive.front_face);
+	} else {
+		glDisable(GL_CULL_FACE);
+	}
+
+	if (depth_stencil.depth_write) {
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(depth_stencil.depth_compare);
+	} else {
+		glDisable(GL_DEPTH_TEST);
+	}
 
 	glUseProgram(pipeline.program());
 	glBindVertexArray(pipeline.vertexArray());
@@ -206,10 +227,15 @@ void setIndexBuffer(const Buffer& buffer, GLenum index_type) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer.handle());
 }
 
+void setUniformBuffer(const Buffer& buffer, uint32_t binding) {
+	assert(buffer.type() == GL_UNIFORM_BUFFER);
+	glBindBufferBase(buffer.type(), binding, buffer.handle());
+}
+
 void draw(uint32_t count, uint32_t offset) {
 	if (current_index_type != 0) {
 		glDrawElements(current_drawing_mode, count, current_index_type,
-		               reinterpret_cast<const void*>(offset));
+		               reinterpret_cast<const void*>(offset * sizeFromType(current_index_type)));
 	} else {
 		glDrawArrays(current_drawing_mode, offset, count);
 	}

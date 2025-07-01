@@ -29,13 +29,20 @@ FetchContent_Declare(
 	SOURCE_SUBDIR cmake
 )
 
+FetchContent_Declare(
+	glm
+	GIT_REPOSITORY https://github.com/g-truc/glm
+)
+
 set(GLFW_LIBRARY_TYPE STATIC)
 set(GLFW_BUILD_EXAMPLES OFF)
 set(GLFW_BUILD_TESTS OFF)
 set(GLFW_BUILD_DOCS OFF)
 
-FetchContent_MakeAvailable(glfw glad)
+set(GLM_BUILD_TESTS OFF)
+
+FetchContent_MakeAvailable(glfw glad glm)
 
 glad_add_library(glad STATIC API gles2=3.1 EXTENSIONS GL_KHR_debug)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad glm::glm)

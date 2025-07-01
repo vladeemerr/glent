@@ -18,6 +18,19 @@ struct VertexAttribute {
 
 using VertexLayout = std::span<const VertexAttribute>;
 
+struct PrimitiveState {
+	GLenum mode;
+	GLenum cull_mode = GL_BACK;
+	GLenum front_face = GL_CCW;
+};
+
+struct DepthStencilState {
+	bool depth_write;
+	GLenum depth_compare = GL_LESS;
+	// TODO: Depth bias
+	// TODO: Stencil configuration
+};
+
 class Buffer final {
 public:
 	Buffer(GLenum type, GLenum usage, size_t size,
@@ -65,10 +78,11 @@ private:
 
 class Pipeline final {
 public:
-	Pipeline(GLenum drawing_mode,
+	Pipeline(const PrimitiveState& primitive,
 	         const VertexLayout layout,
 	         const Shader& vertex_shader,
-	         const Shader& fragment_shader);
+	         const Shader& fragment_shader,
+	         const DepthStencilState& depth_stencil);
 	~Pipeline();
 
 	Pipeline(const Pipeline&) = delete;
@@ -77,13 +91,16 @@ public:
 	Pipeline& operator=(const Pipeline&) = delete;
 	Pipeline& operator=(Pipeline&&) noexcept = delete;
 
-	GLenum drawingMode() const noexcept { return drawing_mode_; }
+	const PrimitiveState& primitiveState() const & noexcept { return primitive_state_; }
+	const DepthStencilState& depthStencilState() const & noexcept { return depth_stencil_state_; }
 	GLintptr vertexStride() const noexcept { return vertex_stride_; }
+
 	GLuint vertexArray() const noexcept { return vertex_array_; }
 	GLuint program() const noexcept { return program_; }
 
 private:
-	GLenum drawing_mode_;
+	const PrimitiveState primitive_state_;
+	const DepthStencilState depth_stencil_state_;
 	GLintptr vertex_stride_ = 0;
 
 	GLuint vertex_array_;
@@ -98,6 +115,7 @@ void clear(float red, float green, float blue, float alpha);
 void setPipeline(const Pipeline&);
 void setVertexBuffer(const Buffer&);
 void setIndexBuffer(const Buffer&, GLenum index_type);
+void setUniformBuffer(const Buffer&, uint32_t binding);
 
 void draw(uint32_t count, uint32_t offset = 0);
 
