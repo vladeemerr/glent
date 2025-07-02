@@ -26,7 +26,7 @@ GLFWwindow* window;
 
 } // namespace
 
-int main() {
+int main() try {
 	if (!glfwInit()) {
 		std::cerr << "Failed to initialize GLFW\n";
 		return 1;
@@ -78,13 +78,13 @@ int main() {
 	for (int32_t i = 0; i < base; ++i) {
 		float r = dr * i;
 
-		Point p0{glm::vec3{glm::cos(r), -1.0f, glm::sin(r)}, 0.0f,
+		Point p0{glm::vec3{glm::cos(r), -1.0f, glm::sin(r)},
 		         glm::vec4{0.0f, 0.0f, 0.0f, 0.0f}};
 
-		Point p1{glm::vec3{glm::cos(r + dr), -1.0f, glm::sin(r + dr)}, 0.0f,
+		Point p1{glm::vec3{glm::cos(r + dr), -1.0f, glm::sin(r + dr)},
 		         glm::vec4{0.0f, 0.0f, 0.0f, 0.0f}};
 
-		Point p2{glm::vec3{0.0f, 1.0f, 0.0f}, 0.0f,
+		Point p2{glm::vec3{0.0f, 1.0f, 0.0f},
 		         glm::vec4{1.0f, 1.0f, 1.0f, 0.5f}};
 
 		points.emplace_back(p0.position, 8.0f, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f});
@@ -138,4 +138,10 @@ int main() {
 	glfwTerminate();
 
 	return 0;
+} catch (const std::runtime_error& e) {
+	std::cerr << e.what() << '\n';
+	return 1;
+} catch (...) {
+	std::cerr << "Foreign exception caught!\n";
+	return 1;
 }

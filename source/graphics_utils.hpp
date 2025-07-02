@@ -12,6 +12,12 @@ struct Point {
 	glm::vec3 position;
 	float size;
 	glm::vec4 color;
+
+	Point() = default;
+	Point(glm::vec3 position, float size, glm::vec4 color)
+	: position{position}, size{size}, color{color} {}
+	Point(glm::vec3 position, glm::vec4 color)
+	: position{position}, color{color} {}
 };
 
 template<size_t N, GLenum T>
