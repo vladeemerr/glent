@@ -5,18 +5,9 @@
 #include <stdexcept>
 #include <sstream>
 
-#include <glm/ext/vector_float2.hpp>
-
 namespace glent::graphics {
 
 namespace {
-
-#include "graphics_shaders.hpp"
-
-struct BatchUniforms {
-	glm::mat4 projected_view;
-	glm::vec2 one_over_viewport;
-};
 
 GLenum current_primitive_mode;
 GLintptr current_vertex_stride;
@@ -24,21 +15,6 @@ GLenum current_index_type;
 
 uint32_t current_viewport_width;
 uint32_t current_viewport_height;
-
-Buffer* unit_quad_vertex_buffer;
-Buffer* batch_uniform_buffer;
-
-Shader* point_batch_vertex_shader;
-Shader* point_batch_fragment_shader;
-Pipeline* point_batch_pipeline;
-
-Shader* line_batch_vertex_shader;
-Shader* line_batch_fragment_shader;
-Pipeline* line_batch_pipeline;
-
-Shader* polygon_batch_vertex_shader;
-Shader* polygon_batch_fragment_shader;
-Pipeline* polygon_batch_pipeline;
 
 void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
                                 GLuint /*id*/, GLenum /*severity*/,
@@ -274,90 +250,12 @@ void setup(uint32_t width, uint32_t height) {
 
 	current_viewport_width = width;
 	current_viewport_height = height;
-
-	const float unit_quad_vertices[] = {
-		-1.0f, -1.0f,
-		1.0f, -1.0f,
-		-1.0f, 1.0f,
-		1.0f, 1.0f,
-	};
-
-	const PrimitiveState batch_primitive_state{
-		.mode = GL_TRIANGLE_STRIP,
-		.cull_mode = GL_NONE,
-	};
-
-	const VertexAttribute batch_vertex_layout[] = {
-		{0, GL_FLOAT, 2, false},
-	};
-
-	const DepthStencilState batch_depth_stencil_state{
-		.depth_write = false,
-	};
-
-	const BlendState batch_blend_state{
-		.enable = true,
-		.color_src_factor = GL_SRC_ALPHA,
-		.color_dst_factor = GL_ONE_MINUS_SRC_ALPHA,
-	};
-
-	unit_quad_vertex_buffer = new Buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
-	                                     sizeof(unit_quad_vertices), unit_quad_vertices);
-
-	batch_uniform_buffer = new Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW,
-	                                  sizeof(BatchUniforms));
-
-	point_batch_vertex_shader = new Shader(GL_VERTEX_SHADER, point_batch_vs_source);
-	point_batch_fragment_shader = new Shader(GL_FRAGMENT_SHADER, point_batch_fs_source);
-	point_batch_pipeline = new Pipeline(
-		batch_primitive_state,
-		batch_vertex_layout,
-		*point_batch_vertex_shader,
-		*point_batch_fragment_shader,
-		batch_depth_stencil_state,
-		batch_blend_state);
-
-	line_batch_vertex_shader = new Shader(GL_VERTEX_SHADER, line_batch_vs_source);
-	line_batch_fragment_shader = new Shader(GL_FRAGMENT_SHADER, line_batch_fs_source);
-	line_batch_pipeline = new Pipeline(
-		batch_primitive_state,
-		batch_vertex_layout,
-		*line_batch_vertex_shader,
-		*line_batch_fragment_shader,
-		batch_depth_stencil_state,
-		batch_blend_state);
-
-	const VertexAttribute polygon_batch_vertex_layout[] = {
-		{0, GL_FLOAT, 4, false},
-		{1, GL_FLOAT, 4, false},
-	};
-
-	polygon_batch_vertex_shader = new Shader(GL_VERTEX_SHADER, polygon_batch_vs_source);
-	polygon_batch_fragment_shader = new Shader(GL_FRAGMENT_SHADER, polygon_batch_fs_source);
-	polygon_batch_pipeline = new Pipeline(
-		PrimitiveState{.mode = GL_TRIANGLES, .cull_mode = GL_NONE},
-		polygon_batch_vertex_layout,
-		*polygon_batch_vertex_shader,
-		*polygon_batch_fragment_shader,
-		batch_depth_stencil_state,
-		batch_blend_state);
 }
 
-void shutdown() {
-	delete polygon_batch_pipeline;
-	delete polygon_batch_fragment_shader;
-	delete polygon_batch_vertex_shader;
+void shutdown() {}
 
-	delete line_batch_pipeline;
-	delete line_batch_fragment_shader;
-	delete line_batch_vertex_shader;
-
-	delete point_batch_pipeline;
-	delete point_batch_fragment_shader;
-	delete point_batch_vertex_shader;
-
-	delete batch_uniform_buffer;
-	delete unit_quad_vertex_buffer;
+glm::vec2 viewport() {
+	return {current_viewport_width, current_viewport_height};
 }
 
 void clear(float red, float green, float blue, float alpha) {
@@ -404,7 +302,6 @@ void setPipeline(const Pipeline& pipeline) {
 
 void setVertexBuffer(const Buffer& buffer) {
 	assert(buffer.type() == GL_ARRAY_BUFFER);
-
 	glBindVertexBuffer(0, buffer.handle(), 0, current_vertex_stride);
 }
 
@@ -450,62 +347,5 @@ void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset) {
 		glDrawArraysInstanced(current_primitive_mode, offset, count, instances);
 	}
 }
-
-template<>
-void PointBatch::draw(const glm::mat4& projected_view) {
-	BatchUniforms uniforms{
-		projected_view,
-		1.0f / glm::vec2(current_viewport_width, current_viewport_height),
-	};
-	batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
-	
-	setPipeline(*point_batch_pipeline);
-	setVertexBuffer(*unit_quad_vertex_buffer);
-	setUniformBuffer(*batch_uniform_buffer, 0);
-	setStorageBuffer(points_, 1);
-
-	drawInstanced(size_, 4);
-
-	size_ = 0;
-}
-
-template<>
-void LineBatch::draw(const glm::mat4& projected_view) {
-	assert(size_ % 2 == 0);
-
-	BatchUniforms uniforms{
-		projected_view,
-		1.0f / glm::vec2(current_viewport_width, current_viewport_height),
-	};
-	batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
-	
-	setPipeline(*line_batch_pipeline);
-	setVertexBuffer(*unit_quad_vertex_buffer);
-	setUniformBuffer(*batch_uniform_buffer, 0);
-	setStorageBuffer(points_, 1);
-
-	drawInstanced(size_ / 2, 4);
-
-	size_ = 0;
-}
-
-template<>
-void PolygonBatch::draw(const glm::mat4& projected_view) {
-	assert(size_ % 3 == 0);
-
-	batch_uniform_buffer->assign(sizeof(glm::mat4), &projected_view);
-	
-	setPipeline(*polygon_batch_pipeline);
-	setVertexBuffer(points_);
-	setUniformBuffer(*batch_uniform_buffer, 0);
-
-	graphics::draw(size_);
-
-	size_ = 0;
-}
-
-template class Batch<1, GL_SHADER_STORAGE_BUFFER>;
-template class Batch<2, GL_SHADER_STORAGE_BUFFER>;
-template class Batch<3, GL_ARRAY_BUFFER>;
 
 } // namespace glent::graphics
