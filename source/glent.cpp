@@ -12,6 +12,7 @@
 
 #include <lodepng.h>
 
+#include "input.hpp"
 #include "graphics.hpp"
 #include "graphics_utils.hpp"
 using namespace glent;
@@ -45,6 +46,8 @@ int main() try {
 		std::cerr << "Failed to create GLFW window\n";
 		return 1;
 	}
+
+	input::setup(window);
 
 	glfwMakeContextCurrent(window);
 	if (!gladLoadGLES2(glfwGetProcAddress)) {
@@ -100,7 +103,11 @@ int main() try {
 	}
 
 	while (!glfwWindowShouldClose(window)) {
+		input::cache();
 		glfwPollEvents();
+
+		auto p = input::mouse::cursorPosition();
+		std::cout << p.x << ' ' << p.y << '\n';
 
 		float t = float(glfwGetTime());
 
