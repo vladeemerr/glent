@@ -10,7 +10,7 @@
 
 #include <glm/ext/vector_float2.hpp>
 
-namespace glent::graphics {
+namespace glint::graphics {
 
 struct VertexAttribute {
 	GLuint index;
@@ -190,4 +190,4 @@ void setTexture(const Texture&, const Sampler&, uint32_t binding);
 void draw(uint32_t count, uint32_t offset = 0);
 void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset = 0);
 
-} // namespace glent::graphics
+} // namespace glint::graphics

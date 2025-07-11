@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <sstream>
 
-namespace glent::graphics {
+namespace glint::graphics {
 
 namespace {
 
@@ -348,4 +348,4 @@ void drawInstanced(uint32_t instances, uint32_t count, uint32_t offset) {
 	}
 }
 
-} // namespace glent::graphics
+} // namespace glint::graphics

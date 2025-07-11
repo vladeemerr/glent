@@ -2,7 +2,7 @@
 
 #include <glm/ext/vector_float2.hpp>
 
-namespace glent::input {
+namespace glint::input {
 
 namespace mouse {
 
@@ -43,4 +43,4 @@ bool isKeyPressed(Key key);
 void setup(void* const window_ptr);
 void cache();
 
-} // namespace glent::input
+} // namespace glint::input

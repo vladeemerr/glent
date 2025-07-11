@@ -2,7 +2,7 @@
 
 #include <glm/ext/vector_float2.hpp>
 
-namespace glent::graphics::utils {
+namespace glint::graphics::utils {
 
 namespace {
 
@@ -55,7 +55,7 @@ out vec4 frag_color;
 
 void main() {
 	vec4 color = out_color;
-	color.a *= out_size - length(out_uv);
+	color.a *= clamp(out_size - length(out_uv), 0.0f, 1.0f);
 
 	if (color.a <= 0.0f)
 		discard;
@@ -314,4 +314,4 @@ template class Batch<1, GL_SHADER_STORAGE_BUFFER>;
 template class Batch<2, GL_SHADER_STORAGE_BUFFER>;
 template class Batch<3, GL_ARRAY_BUFFER>;
 
-} // namespace glent::graphics::utils
+} // namespace glint::graphics::utils

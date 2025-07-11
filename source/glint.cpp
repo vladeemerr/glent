@@ -15,7 +15,7 @@
 #include "input.hpp"
 #include "graphics.hpp"
 #include "graphics_utils.hpp"
-using namespace glent;
+using namespace glint;
 
 namespace {
 
@@ -105,9 +105,6 @@ int main() try {
 	while (!glfwWindowShouldClose(window)) {
 		input::cache();
 		glfwPollEvents();
-
-		auto p = input::mouse::cursorPosition();
-		std::cout << p.x << ' ' << p.y << '\n';
 
 		float t = float(glfwGetTime());
 

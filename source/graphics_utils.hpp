@@ -6,7 +6,7 @@
 
 #include "graphics.hpp"
 
-namespace glent::graphics::utils {
+namespace glint::graphics::utils {
 
 struct Point {
 	glm::vec3 position;
@@ -62,4 +62,4 @@ using PolygonBatch = Batch<3, GL_ARRAY_BUFFER>;
 void setup();
 void shutdown();
 
-} // namespace glent::graphics::utils
+} // namespace glint::graphics::utils

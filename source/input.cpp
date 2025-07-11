@@ -1,10 +1,11 @@
 #include "input.hpp"
-#include "GLFW/glfw3.h"
 
 #include <bitset>
 #include <unordered_map>
 
-namespace glent::input {
+#include <GLFW/glfw3.h>
+
+namespace glint::input {
 
 namespace mouse {
 
@@ -211,4 +212,4 @@ void cache() {
 	mouse::scroll_delta.y = 0.0f;
 }
 
-} // namespace glent::input
+} // namespace glint::input

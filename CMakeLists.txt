@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 include(FetchContent)
 
-project(glent LANGUAGES C CXX)
+project(glint LANGUAGES C CXX)
 
-add_executable(
-	${PROJECT_NAME}
-	source/glent.cpp
+add_executable(${PROJECT_NAME}
+	source/glint.cpp
 	source/input.cpp
 	source/graphics.cpp
 	source/graphics_utils.cpp
@@ -29,13 +28,6 @@ FetchContent_Declare(
 )
 
 FetchContent_Declare(
-	glad
-	GIT_REPOSITORY https://github.com/Dav1dde/glad.git
-	GIT_TAG v2.0.8
-	SOURCE_SUBDIR cmake
-)
-
-FetchContent_Declare(
 	glm
 	GIT_REPOSITORY https://github.com/g-truc/glm
 )
@@ -52,10 +44,14 @@ set(GLFW_BUILD_DOCS OFF)
 
 set(GLM_BUILD_TESTS OFF)
 
-FetchContent_MakeAvailable(glfw glad glm lodepng)
+FetchContent_MakeAvailable(glfw glm lodepng)
 
-glad_add_library(glad STATIC API gles2=3.1 EXTENSIONS GL_KHR_debug)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad glm::glm)
-target_sources(${PROJECT_NAME} PRIVATE ${lodepng_SOURCE_DIR}/lodepng.cpp)
-target_include_directories(${PROJECT_NAME} PRIVATE ${lodepng_SOURCE_DIR})
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw glm::glm)
+target_sources(${PROJECT_NAME} PRIVATE
+	external/glad/src/gles2.c
+	${lodepng_SOURCE_DIR}/lodepng.cpp
+)
+target_include_directories(${PROJECT_NAME} PRIVATE
+	external/glad/include
+	${lodepng_SOURCE_DIR}
+)
