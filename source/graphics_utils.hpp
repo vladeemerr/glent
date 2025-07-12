@@ -4,7 +4,7 @@
 #include <glm/ext/vector_float4.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 
-#include "graphics.hpp"
+#include "graphics_gl.hpp"
 
 namespace glint::graphics::utils {
 
@@ -52,7 +52,7 @@ public:
 private:
 	size_t size_ = 0;
 	size_t capacity_;
-	Buffer points_;
+	gl::Buffer points_;
 };
 
 using PointBatch = Batch<1, GL_SHADER_STORAGE_BUFFER>;

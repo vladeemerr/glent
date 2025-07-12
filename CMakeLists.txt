@@ -6,8 +6,9 @@ project(glint LANGUAGES C CXX)
 add_executable(${PROJECT_NAME}
 	source/glint.cpp
 	source/input.cpp
-	source/graphics.cpp
+	source/graphics_gl.cpp
 	source/graphics_utils.cpp
+	source/graphics.cpp
 )
 
 if(LINUX)

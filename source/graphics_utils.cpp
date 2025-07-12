@@ -154,20 +154,20 @@ struct BatchUniforms {
 	glm::vec2 one_over_viewport;
 };
 
-Buffer* unit_quad_vertex_buffer;
-Buffer* batch_uniform_buffer;
+gl::Buffer* unit_quad_vertex_buffer;
+gl::Buffer* batch_uniform_buffer;
 
-Shader* point_batch_vertex_shader;
-Shader* point_batch_fragment_shader;
-Pipeline* point_batch_pipeline;
+gl::Shader* point_batch_vertex_shader;
+gl::Shader* point_batch_fragment_shader;
+gl::Pipeline* point_batch_pipeline;
 
-Shader* line_batch_vertex_shader;
-Shader* line_batch_fragment_shader;
-Pipeline* line_batch_pipeline;
+gl::Shader* line_batch_vertex_shader;
+gl::Shader* line_batch_fragment_shader;
+gl::Pipeline* line_batch_pipeline;
 
-Shader* polygon_batch_vertex_shader;
-Shader* polygon_batch_fragment_shader;
-Pipeline* polygon_batch_pipeline;
+gl::Shader* polygon_batch_vertex_shader;
+gl::Shader* polygon_batch_fragment_shader;
+gl::Pipeline* polygon_batch_pipeline;
 
 } // namespace
 
@@ -175,16 +175,16 @@ template<>
 void PointBatch::draw(const glm::mat4& projected_view) {
 	BatchUniforms uniforms{
 		projected_view,
-		1.0f / graphics::viewport(),
+		1.0f / gl::viewport(),
 	};
 	batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
 	
-	setPipeline(*point_batch_pipeline);
-	setVertexBuffer(*unit_quad_vertex_buffer);
-	setUniformBuffer(*batch_uniform_buffer, 0);
-	setStorageBuffer(points_, 1);
+	gl::setPipeline(*point_batch_pipeline);
+	gl::setVertexBuffer(*unit_quad_vertex_buffer);
+	gl::setUniformBuffer(*batch_uniform_buffer, 0);
+	gl::setStorageBuffer(points_, 1);
 
-	drawInstanced(size_, 4);
+	gl::drawInstanced(size_, 4);
 
 	size_ = 0;
 }
@@ -195,16 +195,16 @@ void LineBatch::draw(const glm::mat4& projected_view) {
 
 	BatchUniforms uniforms{
 		projected_view,
-		1.0f / graphics::viewport(),
+		1.0f / gl::viewport(),
 	};
 	batch_uniform_buffer->assign(sizeof(uniforms), &uniforms);
 	
-	setPipeline(*line_batch_pipeline);
-	setVertexBuffer(*unit_quad_vertex_buffer);
-	setUniformBuffer(*batch_uniform_buffer, 0);
-	setStorageBuffer(points_, 1);
+	gl::setPipeline(*line_batch_pipeline);
+	gl::setVertexBuffer(*unit_quad_vertex_buffer);
+	gl::setUniformBuffer(*batch_uniform_buffer, 0);
+	gl::setStorageBuffer(points_, 1);
 
-	drawInstanced(size_ / 2, 4);
+	gl::drawInstanced(size_ / 2, 4);
 
 	size_ = 0;
 }
@@ -215,11 +215,11 @@ void PolygonBatch::draw(const glm::mat4& projected_view) {
 
 	batch_uniform_buffer->assign(sizeof(glm::mat4), &projected_view);
 	
-	setPipeline(*polygon_batch_pipeline);
-	setVertexBuffer(points_);
-	setUniformBuffer(*batch_uniform_buffer, 0);
+	gl::setPipeline(*polygon_batch_pipeline);
+	gl::setVertexBuffer(points_);
+	gl::setUniformBuffer(*batch_uniform_buffer, 0);
 
-	graphics::draw(size_);
+	gl::draw(size_);
 
 	size_ = 0;
 }
@@ -231,6 +231,8 @@ void setup() {
 		-1.0f, 1.0f,
 		1.0f, 1.0f,
 	};
+
+	using namespace glint::graphics::gl;
 
 	const PrimitiveState batch_primitive_state{
 		.mode = GL_TRIANGLE_STRIP,
