@@ -58,7 +58,20 @@ int main() try {
 	glfwSwapInterval(1);
 
 	graphics::gl::setup(window_default_width, window_default_height);
+	graphics::setup();
 	graphics::utils::setup();
+
+	graphics::Camera camera{
+		.viewport = glm::vec2(window_default_width, window_default_height),
+		.fov = 70.0f,
+		.position = glm::vec3{0.0f, 0.0f, 2.0f},
+	};
+
+	auto* cube_mesh = new graphics::Mesh(graphics::Mesh::makeCube());
+
+	std::vector<graphics::Model> models{
+		{*cube_mesh, glm::mat4(1.0f), glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)}
+	};
 
 	while (!glfwWindowShouldClose(window)) {
 		input::cache();
@@ -66,12 +79,19 @@ int main() try {
 
 		float t = float(glfwGetTime());
 
-		graphics::gl::clear(0.05f, 0.05f, 0.05f, 1.0f);
+		models[0].transform = glm::rotate(glm::mat4(1.0f), t, {1.0f, 1.0f, 1.0f});
+		models[0].color.r = 0.5f + glm::sin(t) * 0.5f;
+		models[0].color.g = 0.5f + glm::cos(t) * 0.5f;
+		models[0].color.b = 0.5f + glm::sin(t) * glm::cos(t) * 0.5f;
+		graphics::render(models, camera);
 
 		glfwSwapBuffers(window);
 	}
 
+	delete cube_mesh;
+
 	graphics::utils::shutdown();
+	graphics::shutdown();
 	graphics::gl::shutdown();
 
 	glfwDestroyWindow(window);

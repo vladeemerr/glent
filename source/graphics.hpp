@@ -1,12 +1,45 @@
 #pragma once
 
+#include <cstdint>
+#include <span>
+
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/quaternion_float.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 
+#include "graphics_gl.hpp"
+
 namespace glint::graphics {
+
+struct Vertex final {
+	glm::vec3 position;
+	glm::vec3 normal;
+	glm::vec2 uv;
+};
+
+struct Mesh final {
+	gl::Buffer vertex_buffer;
+	gl::Buffer index_buffer;
+	uint32_t count;
+
+	Mesh(const std::span<const Vertex> vertices,
+	     const std::span<const uint32_t> indices)
+	: vertex_buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
+	                vertices.size() * sizeof(Vertex), vertices.data()),
+	  index_buffer(GL_ELEMENT_ARRAY_BUFFER, GL_STATIC_DRAW,
+	               indices.size() * sizeof(uint32_t), indices.data()),
+	  count{static_cast<uint32_t>(indices.size())} {}
+
+	static Mesh makeCube();
+};
+
+struct Model final {
+	const Mesh& mesh;
+	glm::mat4 transform;
+	glm::vec4 color;
+};
 
 struct Camera final {
 public:
@@ -37,5 +70,10 @@ public:
 		return orthographic * view;
 	}
 };
+
+void setup();
+void shutdown();
+
+void render(const std::span<const Model> models, const Camera& camera);
 
 } // namespace glint::graphics
