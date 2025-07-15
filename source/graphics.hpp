@@ -13,6 +13,11 @@
 
 namespace glint::graphics {
 
+enum class RenderMode {
+	untextured_unlit,
+	untextured_lit,
+};
+
 struct Vertex final {
 	glm::vec3 position;
 	glm::vec3 normal;
@@ -20,25 +25,40 @@ struct Vertex final {
 };
 
 struct Mesh final {
-	gl::Buffer vertex_buffer;
-	gl::Buffer index_buffer;
-	uint32_t count;
-
+public:
+	Mesh() = delete;
 	Mesh(const std::span<const Vertex> vertices,
 	     const std::span<const uint32_t> indices)
-	: vertex_buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
-	                vertices.size() * sizeof(Vertex), vertices.data()),
-	  index_buffer(GL_ELEMENT_ARRAY_BUFFER, GL_STATIC_DRAW,
-	               indices.size() * sizeof(uint32_t), indices.data()),
-	  count{static_cast<uint32_t>(indices.size())} {}
+	: vertex_buffer_(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
+	                 vertices.size() * sizeof(Vertex), vertices.data()),
+	  index_buffer_(GL_ELEMENT_ARRAY_BUFFER, GL_STATIC_DRAW,
+	                indices.size() * sizeof(uint32_t), indices.data()),
+	  count_{static_cast<uint32_t>(indices.size())} {}
+
+	const gl::Buffer& vertexBuffer() const & noexcept { return vertex_buffer_; }
+	const gl::Buffer& indexBuffer() const & noexcept { return index_buffer_; }
+	uint32_t count() const { return count_; }
 
 	static Mesh makeCube();
+	static Mesh makePlane(glm::vec3 normal);
+
+private:
+	gl::Buffer vertex_buffer_;
+	gl::Buffer index_buffer_;
+	uint32_t count_;
 };
 
 struct Model final {
 	const Mesh& mesh;
 	glm::mat4 transform;
-	glm::vec4 color;
+	glm::vec3 diffuse_color;
+	glm::vec3 specular_color;
+	float roughness;
+};
+
+struct Light final {
+	glm::vec3 position;
+	alignas(16) glm::vec3 color;
 };
 
 struct Camera final {
@@ -74,6 +94,9 @@ public:
 void setup();
 void shutdown();
 
-void render(const std::span<const Model> models, const Camera& camera);
+void render(const std::span<const Model> models,
+            const Camera& camera,
+            const std::span<const Light> lights);
+void setRenderMode(const RenderMode mode);
 
 } // namespace glint::graphics
