@@ -73,7 +73,7 @@ layout(std140, binding = 1) uniform ModelUniforms {
 	mat4 transform;
 	vec3 diffuse_color;
 	vec3 specular_color;
-	float roughness;
+	float shininess;
 };
 
 void main() {
@@ -112,7 +112,7 @@ layout(std140, binding = 1) uniform ModelUniforms {
 	mat4 transform;
 	vec3 diffuse_color;
 	vec3 specular_color;
-	float roughness;
+	float shininess;
 };
 
 void main() {
@@ -127,14 +127,14 @@ void main() {
 		vec3 half_vector = normalize(view_direction + light_direction);
 		float light_distance = distance(light.position_size.xyz, f_position);
 
-		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), roughness) *
-		                specular_color;
-
 		float coeff = max(dot(normal, light_direction), 0.0f);
 		float falloff = (light.position_size.w * light.position_size.w) /
 		                (1.0f + light_distance * light_distance);
 
-		color += (specular + diffuse_color) * light.color * coeff * falloff;
+		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), shininess) *
+		                specular_color;
+
+		color += (specular + diffuse_color) * coeff * light.color * falloff;
 	}
 	
 	frag_color = vec4(ambience * diffuse_color + color, 1.0f);
@@ -153,7 +153,7 @@ struct ModelUniforms {
 	glm::mat4 transform;
 	GLSL_STD140_ALIGN glm::vec3 diffuse_color;
 	GLSL_STD140_ALIGN glm::vec3 specular_color;
-	float roughness;
+	float shininess;
 };
 
 gl::Pipeline* untextured_unlit_pipeline;
@@ -207,7 +207,7 @@ void setup() {
 
 	current_pipeline = untextured_lit_pipeline;
 
-	camera_uniforms.ambience = {0.1f, 0.1f, 0.1f};
+	camera_uniforms.ambience = {0.3f, 0.3f, 0.3f};
 }
 
 void shutdown() {
@@ -237,9 +237,9 @@ void render(const std::span<const Model> models,
 		ModelUniforms model_uniforms{
 			.transform = m.transform,
 			.diffuse_color = m.diffuse_color / glm::pi<float>(),
-			.specular_color = m.specular_color * ((m.roughness + 8.0f) /
+			.specular_color = m.specular_color * ((m.shininess + 8.0f) /
 			                                      (8.0f * glm::pi<float>())),
-			.roughness = m.roughness,
+			.shininess = m.shininess,
 		};
 		model_uniform_buffer->assign(sizeof(ModelUniforms), &model_uniforms);
 		

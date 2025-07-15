@@ -53,7 +53,7 @@ struct Model final {
 	glm::mat4 transform;
 	glm::vec3 diffuse_color;
 	glm::vec3 specular_color;
-	float roughness;
+	float shininess;
 };
 
 struct Light final {

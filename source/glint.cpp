@@ -76,15 +76,15 @@ int main() try {
 			.mesh = *cube_mesh,
 			.transform = glm::mat4(1.0f),
 			.diffuse_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.specular_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.roughness = 1.0f,
+			.specular_color = glm::vec3(0.0f, 0.0f, 0.0f),
+			.shininess = 1.0f,
 		},
 		{
 			.mesh = *plane_mesh,
 			.transform = glm::scale(glm::mat4(1.0f), {10.0f, 10.0f, 10.0f}),
 			.diffuse_color = glm::vec3(1.0f, 1.0f, 1.0f),
 			.specular_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.roughness = 1.0f,
+			.shininess = 32.0f,
 		},
 	};
 
