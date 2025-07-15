@@ -76,19 +76,19 @@ int main() try {
 			.transform = glm::mat4(1.0f),
 			.diffuse_color = glm::vec3(1.0f, 1.0f, 1.0f),
 			.specular_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.roughness = 15.0f,
+			.roughness = 1.0f,
 		},
 		{
 			.mesh = *plane_mesh,
 			.transform = glm::scale(glm::mat4(1.0f), {10.0f, 10.0f, 10.0f}),
 			.diffuse_color = glm::vec3(1.0f, 1.0f, 1.0f),
 			.specular_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.roughness = 15.0f,
+			.roughness = 1.0f,
 		},
 	};
 
 	std::vector<graphics::Light> lights{
-		{{}, {1.0f, 1.0f, 1.0f}}
+		{{}, 1.5f, {1.0f, 1.0f, 1.0f}}
 	};
 
 	while (!glfwWindowShouldClose(window)) {

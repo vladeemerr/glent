@@ -51,7 +51,7 @@ constexpr char untextured_lit_vertex_shader_code[] = R"(
 #version 310 es
 
 struct Light {
-	mediump vec3 position;
+	mediump vec4 position_size;
 	mediump vec3 color;
 };
 
@@ -81,7 +81,7 @@ void main() {
 	vec4 normal = transform * vec4(v_normal, 0.0f);
 
 	gl_Position = view_projection * position;
-	f_position = position.xyz / position.w;
+	f_position = position.xyz;
 	f_normal = normalize(normal.xyz);
 }
 )";
@@ -91,7 +91,7 @@ constexpr char untextured_lit_fragment_shader_code[] = R"(
 precision mediump float;
 
 struct Light {
-	vec3 position;
+	vec4 position_size;
 	vec3 color;
 };
 
@@ -117,26 +117,27 @@ layout(std140, binding = 1) uniform ModelUniforms {
 
 void main() {
 	vec3 normal = normalize(f_normal);
-
 	vec3 view_direction = normalize(view_position - f_position);
 
-	vec3 color = ambience * diffuse_color;
+	vec3 color = vec3(0.0f);
 	for (int i = 0; i < light_count; ++i) {
 		Light light = lights[i];
 
-		vec3 light_direction = normalize(light.position - f_position);
+		vec3 light_direction = normalize(light.position_size.xyz - f_position);
 		vec3 half_vector = normalize(view_direction + light_direction);
-		float light_distance = distance(light.position, f_position);
+		float light_distance = distance(light.position_size.xyz, f_position);
 
-		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), roughness) * specular_color;
-		
-		float coeff = max(dot(normal, light_direction), 0.0f) /
-		              (light_distance * light_distance);
+		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), roughness) *
+		                specular_color;
 
-		color += (diffuse_color + specular) * light.color * coeff;
+		float coeff = max(dot(normal, light_direction), 0.0f);
+		float falloff = (light.position_size.w * light.position_size.w) /
+		                (1.0f + light_distance * light_distance);
+
+		color += (specular + diffuse_color) * light.color * coeff * falloff;
 	}
 	
-	frag_color = vec4(color, 1.0f);
+	frag_color = vec4(ambience * diffuse_color + color, 1.0f);
 }
 )";
 
@@ -235,8 +236,9 @@ void render(const std::span<const Model> models,
 	for (const auto& m : models) {
 		ModelUniforms model_uniforms{
 			.transform = m.transform,
-			.diffuse_color = m.diffuse_color,
-			.specular_color = m.specular_color,
+			.diffuse_color = m.diffuse_color / glm::pi<float>(),
+			.specular_color = m.specular_color * ((m.roughness + 8.0f) /
+			                                      (8.0f * glm::pi<float>())),
 			.roughness = m.roughness,
 		};
 		model_uniform_buffer->assign(sizeof(ModelUniforms), &model_uniforms);

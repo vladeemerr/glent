@@ -58,6 +58,7 @@ struct Model final {
 
 struct Light final {
 	glm::vec3 position;
+	float size;
 	alignas(16) glm::vec3 color;
 };
 
