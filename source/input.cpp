@@ -7,12 +7,18 @@
 
 namespace glint::input {
 
+namespace {
+
+GLFWwindow* window;
+
+} // namespace
+
 namespace mouse {
 
 namespace {
 
 std::bitset<static_cast<size_t>(mouse::Button::count)> states, cached_states;
-glm::vec2 cursor_position;
+glm::vec2 cursor_position, cached_cursor_position;
 glm::vec2 scroll_delta;
 
 } // namespace
@@ -26,8 +32,17 @@ bool isButtonPressed(Button button) {
 	return states[index] && !cached_states[index];
 }
 
+void setCaptured(bool capture) {
+	glfwSetInputMode(window, GLFW_CURSOR,
+	                 capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+}
+
 glm::vec2 cursorPosition() {
 	return cursor_position;
+}
+
+glm::vec2 cursorDelta() {
+	return cursor_position - cached_cursor_position;
 }
 
 glm::vec2 scrollDelta() {
@@ -56,7 +71,7 @@ bool isKeyPressed(Key key) {
 } // namespace keyboard
 
 void setup(void* const window_ptr) {
-	GLFWwindow* window = static_cast<GLFWwindow*>(window_ptr);
+	window = static_cast<GLFWwindow*>(window_ptr);
 	
 	glfwSetKeyCallback(window, [](GLFWwindow*, int key, int /*scancode*/,
 	                              int action, int /*mods*/) {
@@ -207,6 +222,8 @@ void setup(void* const window_ptr) {
 void cache() {
 	keyboard::cached_states = keyboard::states;
 	mouse::cached_states = mouse::states;
+
+	mouse::cached_cursor_position = mouse::cursor_position;
 
 	mouse::scroll_delta.x = 0.0f;
 	mouse::scroll_delta.y = 0.0f;

@@ -71,10 +71,20 @@ public:
 	glm::vec2 viewport;
 	float fov = default_fov;
 	glm::vec3 position = glm::vec3();
-	glm::quat orientation = glm::quat(1.0f, {});
+	glm::vec3 rotation = glm::vec3();
+
+	glm::quat calculateOrientation() const {
+		glm::quat pitch = glm::angleAxis(rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+		glm::quat yaw = glm::angleAxis(rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::quat roll = glm::angleAxis(rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+
+		return glm::normalize(roll * yaw * pitch);
+	}
 
 	glm::mat4 calculateView() const {
-		glm::mat4 model = glm::translate(glm::mat4_cast(orientation), position);
+		glm::quat orientation = calculateOrientation();
+		glm::mat4 rotation = glm::mat4_cast(orientation);
+		glm::mat4 model = glm::translate(glm::mat4(1.0f), position) * rotation;
 		return glm::inverse(model);
 	}
 

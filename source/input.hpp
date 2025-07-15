@@ -16,7 +16,10 @@ enum class Button {
 bool isButtonDown(Button button);
 bool isButtonPressed(Button button);
 
+void setCaptured(bool capture);
+
 glm::vec2 cursorPosition();
+glm::vec2 cursorDelta();
 glm::vec2 scrollDelta();
 
 } // namespace mouse

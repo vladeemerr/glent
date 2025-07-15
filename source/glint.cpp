@@ -48,6 +48,7 @@ int main() try {
 	}
 
 	input::setup(window);
+	input::mouse::setCaptured(true);
 
 	glfwMakeContextCurrent(window);
 	if (!gladLoadGLES2(glfwGetProcAddress)) {
@@ -94,6 +95,48 @@ int main() try {
 	while (!glfwWindowShouldClose(window)) {
 		input::cache();
 		glfwPollEvents();
+
+		camera.rotation.x -= input::mouse::cursorDelta().y * 0.01f;
+		camera.rotation.x = glm::clamp(camera.rotation.x,
+		                               -glm::pi<float>() / 2.0f,
+		                               glm::pi<float>() / 2.0f);
+
+		camera.rotation.y -= input::mouse::cursorDelta().x * 0.01f;
+		camera.rotation.y = glm::mod(camera.rotation.y, 2.0f * glm::pi<float>());
+
+		glm::quat orientation = camera.calculateOrientation();
+		glm::quat forward_orient = orientation *
+		                           glm::quat(0.0f, {0.0f, 0.0f, -1.0f}) *
+		                           glm::conjugate(orientation);
+		glm::vec3 forward = glm::normalize(glm::vec3(forward_orient.x,
+		                                             forward_orient.y,
+		                                             forward_orient.z));
+		glm::vec3 up(0.0f, 1.0f, 0.0f);
+		glm::vec3 right = glm::normalize(glm::cross(forward, up));
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::w)) {
+			camera.position += forward * 0.1f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::s)) {
+			camera.position -= forward * 0.1f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::a)) {
+			camera.position -= right * 0.1f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::d)) {
+			camera.position += right * 0.1f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::q)) {
+			camera.position += up * 0.1f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::z)) {
+			camera.position -= up * 0.1f;
+		}
 
 		float t = float(glfwGetTime());
 
