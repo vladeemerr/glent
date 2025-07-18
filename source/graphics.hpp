@@ -16,6 +16,7 @@ namespace glint::graphics {
 enum class RenderMode {
 	untextured_unlit,
 	untextured_lit,
+	count,
 };
 
 struct Vertex final {
@@ -24,7 +25,7 @@ struct Vertex final {
 	glm::vec2 uv;
 };
 
-struct Mesh final {
+class Mesh final {
 public:
 	Mesh() = delete;
 	Mesh(const std::span<const Vertex> vertices,
@@ -48,12 +49,30 @@ private:
 	uint32_t count_;
 };
 
-struct Model final {
-	const Mesh& mesh;
-	glm::mat4 transform;
-	glm::vec3 diffuse_color;
+class Material final {
+public:
+	Material(RenderMode mode,
+	         glm::vec3 albedo_color,
+	         glm::vec3 specular_color = glm::vec3(0.0f, 0.0f, 0.0f),
+	         float shininess = 1.0f);
+
+	RenderMode renderMode() const noexcept { return mode_; }
+	gl::Pipeline& pipeline() const & noexcept { return *pipeline_; };
+
+public:
+	glm::vec3 albedo_color;
 	glm::vec3 specular_color;
 	float shininess;
+
+private:
+	RenderMode mode_;
+	gl::Pipeline* pipeline_;
+};
+
+struct Model final {
+	const Mesh& mesh;
+	const Material& material;
+	glm::mat4 transform;
 };
 
 struct Light final {
@@ -108,6 +127,5 @@ void shutdown();
 void render(const std::span<const Model> models,
             const Camera& camera,
             const std::span<const Light> lights);
-void setRenderMode(const RenderMode mode);
 
 } // namespace glint::graphics

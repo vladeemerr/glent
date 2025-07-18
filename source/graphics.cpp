@@ -1,8 +1,6 @@
 #include "graphics.hpp"
 #include "graphics_gl.hpp"
 
-#include <vector>
-
 #define GLSL_STD140_ALIGN alignas(16)
 
 namespace glint::graphics {
@@ -71,7 +69,7 @@ layout(std140, binding = 0) uniform CameraUniforms {
 
 layout(std140, binding = 1) uniform ModelUniforms {
 	mat4 transform;
-	vec3 diffuse_color;
+	vec3 albedo_color;
 	vec3 specular_color;
 	float shininess;
 };
@@ -110,7 +108,7 @@ layout(std140, binding = 0) uniform CameraUniforms {
 
 layout(std140, binding = 1) uniform ModelUniforms {
 	mat4 transform;
-	vec3 diffuse_color;
+	vec3 albedo_color;
 	vec3 specular_color;
 	float shininess;
 };
@@ -119,7 +117,7 @@ void main() {
 	vec3 normal = normalize(f_normal);
 	vec3 view_direction = normalize(view_position - f_position);
 
-	vec3 color = vec3(0.0f);
+	vec3 color = ambience * albedo_color;
 	for (int i = 0; i < light_count; ++i) {
 		Light light = lights[i];
 
@@ -134,10 +132,10 @@ void main() {
 		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), shininess) *
 		                specular_color;
 
-		color += (specular + diffuse_color) * coeff * light.color * falloff;
+		color += (specular + albedo_color) * coeff * light.color * falloff;
 	}
 	
-	frag_color = vec4(ambience * diffuse_color + color, 1.0f);
+	frag_color = vec4(color, 1.0f);
 }
 )";
 
@@ -151,18 +149,16 @@ struct CameraUniforms {
 
 struct ModelUniforms {
 	glm::mat4 transform;
-	GLSL_STD140_ALIGN glm::vec3 diffuse_color;
+	GLSL_STD140_ALIGN glm::vec3 albedo_color;
 	GLSL_STD140_ALIGN glm::vec3 specular_color;
 	float shininess;
 };
 
-gl::Pipeline* untextured_unlit_pipeline;
-gl::Pipeline* untextured_lit_pipeline;
+gl::Pipeline* pipelines[static_cast<size_t>(RenderMode::count)];
 gl::Buffer* camera_uniform_buffer;
 gl::Buffer* model_uniform_buffer;
 
 CameraUniforms camera_uniforms;
-gl::Pipeline* current_pipeline;
 
 } // namespace
 
@@ -183,7 +179,7 @@ void setup() {
 	gl::Shader untextured_unlit_fragment_shader(GL_FRAGMENT_SHADER,
 	                                            untextured_unlit_fragment_shader_code);
 	
-	untextured_unlit_pipeline = new gl::Pipeline(
+	pipelines[static_cast<size_t>(RenderMode::untextured_unlit)] = new gl::Pipeline(
 		solid_primitive_state, attributes,
 		untextured_unlit_vertex_shader, untextured_unlit_fragment_shader,
 		solid_depth_stencil_state, solid_blend_state);
@@ -194,7 +190,7 @@ void setup() {
 	gl::Shader untextured_lit_fragment_shader(GL_FRAGMENT_SHADER,
 	                                          untextured_lit_fragment_shader_code);
 
-	untextured_lit_pipeline = new gl::Pipeline(
+	pipelines[static_cast<size_t>(RenderMode::untextured_lit)] = new gl::Pipeline(
 		solid_primitive_state, attributes,
 		untextured_lit_vertex_shader, untextured_lit_fragment_shader,
 		solid_depth_stencil_state, solid_blend_state);
@@ -205,16 +201,14 @@ void setup() {
 	model_uniform_buffer = new gl::Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW,
 	                                      sizeof(ModelUniforms));
 
-	current_pipeline = untextured_lit_pipeline;
-
 	camera_uniforms.ambience = {0.3f, 0.3f, 0.3f};
 }
 
 void shutdown() {
 	delete model_uniform_buffer;
 	delete camera_uniform_buffer;
-	delete untextured_lit_pipeline;
-	delete untextured_unlit_pipeline;
+	delete pipelines[static_cast<size_t>(RenderMode::untextured_lit)];
+	delete pipelines[static_cast<size_t>(RenderMode::untextured_unlit)];
 }
 
 void render(const std::span<const Model> models,
@@ -229,38 +223,35 @@ void render(const std::span<const Model> models,
 	            camera_uniforms.lights);
 	camera_uniform_buffer->assign(sizeof(CameraUniforms), &camera_uniforms);
 	
-	gl::setPipeline(*current_pipeline);
-	gl::setUniformBuffer(*camera_uniform_buffer, 0);
-	gl::setUniformBuffer(*model_uniform_buffer, 1);
+	for (const auto& model : models) {
+		gl::setPipeline(model.material.pipeline());
+		gl::setUniformBuffer(*camera_uniform_buffer, 0);
+		gl::setUniformBuffer(*model_uniform_buffer, 1);
 
-	for (const auto& m : models) {
+		const auto& material = model.material;
+
 		ModelUniforms model_uniforms{
-			.transform = m.transform,
-			.diffuse_color = m.diffuse_color / glm::pi<float>(),
-			.specular_color = m.specular_color * ((m.shininess + 8.0f) /
-			                                      (8.0f * glm::pi<float>())),
-			.shininess = m.shininess,
+			.transform = model.transform,
+			.albedo_color = material.albedo_color / glm::pi<float>(),
+			.specular_color = material.specular_color *
+			                  ((material.shininess + 8.0f) / (8.0f * glm::pi<float>())),
+			.shininess = material.shininess,
 		};
 		model_uniform_buffer->assign(sizeof(ModelUniforms), &model_uniforms);
 		
-		gl::setVertexBuffer(m.mesh.vertexBuffer());
-		gl::setIndexBuffer(m.mesh.indexBuffer(), GL_UNSIGNED_INT);
+		gl::setVertexBuffer(model.mesh.vertexBuffer());
+		gl::setIndexBuffer(model.mesh.indexBuffer(), GL_UNSIGNED_INT);
 
-		gl::draw(m.mesh.count());
+		gl::draw(model.mesh.count());
 	}
 }
 
-void setRenderMode(const RenderMode mode) {
-	switch (mode) {
-		case RenderMode::untextured_unlit:
-			current_pipeline = untextured_unlit_pipeline;
-			break;
-
-		case RenderMode::untextured_lit:
-			current_pipeline = untextured_lit_pipeline;
-			break;
-	}
-}
+Material::Material(RenderMode mode,
+                   glm::vec3 albedo_color,
+                   glm::vec3 specular_color,
+                   float shininess)
+: albedo_color{albedo_color}, specular_color{specular_color}, shininess{shininess},
+  mode_{mode}, pipeline_{pipelines[static_cast<size_t>(mode)]} {}
 
 Mesh Mesh::makeCube() {
 	const Vertex vertices[] = {

@@ -71,25 +71,31 @@ int main() try {
 	auto* cube_mesh = new graphics::Mesh(graphics::Mesh::makeCube());
 	auto* plane_mesh = new graphics::Mesh(graphics::Mesh::makePlane({0.0f, 1.0f, 0.0f}));
 
+	graphics::Material cube_material(graphics::RenderMode::untextured_lit,
+	                                 glm::vec3(1.0f, 1.0f, 1.0f),
+	                                 glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
+
+	graphics::Material floor_material(graphics::RenderMode::untextured_lit,
+	                                  glm::vec3(1.0f, 1.0f, 1.0f),
+	                                  glm::vec3(1.0f, 1.0f, 1.0f), 32.0f);
+
 	std::vector<graphics::Model> models{
 		{
 			.mesh = *cube_mesh,
+			.material = cube_material,
 			.transform = glm::mat4(1.0f),
-			.diffuse_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.specular_color = glm::vec3(0.0f, 0.0f, 0.0f),
-			.shininess = 1.0f,
 		},
 		{
 			.mesh = *plane_mesh,
+			.material = floor_material,
 			.transform = glm::scale(glm::mat4(1.0f), {10.0f, 10.0f, 10.0f}),
-			.diffuse_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.specular_color = glm::vec3(1.0f, 1.0f, 1.0f),
-			.shininess = 32.0f,
 		},
 	};
 
 	std::vector<graphics::Light> lights{
-		{{}, 1.5f, {1.0f, 1.0f, 1.0f}}
+		{{}, 1.5f, {1.0f, 0.3f, 0.3f}},
+		{{}, 1.5f, {0.3f, 1.0f, 0.3f}},
+		{{}, 1.5f, {0.3f, 0.3f, 1.0f}},
 	};
 
 	while (!glfwWindowShouldClose(window)) {
@@ -140,13 +146,19 @@ int main() try {
 
 		float t = float(glfwGetTime());
 
-		lights[0].position = {2.0f * glm::cos(t), 1.0f, 2.0f * glm::sin(t)};
+		float theta = 2.0f * glm::pi<float>() / lights.size();
+		for (size_t i = 0; i < lights.size(); ++i) {
+			float angle = t + theta * i;
+			lights[i].position = {2.0f * glm::cos(angle), 1.5f, 2.0f * glm::sin(angle)};
+		}
 
 		models[0].transform = glm::rotate(glm::translate(glm::mat4(1.0f), {0.0f, 1.0f, 0.0f}),
-		                                  t, {1.0f, 1.0f, 1.0f});
-		models[0].diffuse_color.r = 0.5f + glm::sin(t) * 0.5f;
-		models[0].diffuse_color.g = 0.5f + glm::cos(t) * 0.5f;
-		models[0].diffuse_color.b = 0.5f + glm::sin(t) * glm::cos(t) * 0.5f;
+		                                  t, glm::normalize(glm::vec3{glm::cos(t), glm::sin(t),
+		                                                              glm::cos(t) * glm::sin(t)}));
+		cube_material.albedo_color.r = 0.5f + glm::sin(t) * 0.5f;
+		cube_material.albedo_color.g = 0.5f + glm::cos(t) * 0.5f;
+		cube_material.albedo_color.b = 0.5f + glm::sin(t) * glm::cos(t) * 0.5f;
+
 		graphics::render(models, camera, lights);
 
 		glfwSwapBuffers(window);
