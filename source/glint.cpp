@@ -68,16 +68,26 @@ int main() try {
 		.position = glm::vec3{0.0f, 1.0f, 2.0f},
 	};
 
+	auto* texture_sampler = new graphics::gl::Sampler({});
+
+	uint32_t texture_width, texture_height;
+	std::vector<uint8_t> texture_data;
+	lodepng::decode(texture_data, texture_width, texture_height, "./assets/texture.png");
+	auto* floor_texture = new graphics::gl::Texture(GL_RGBA8,
+	                                                texture_width, texture_height,
+	                                                texture_data.data());
+
 	auto* cube_mesh = new graphics::Mesh(graphics::Mesh::makeCube());
 	auto* plane_mesh = new graphics::Mesh(graphics::Mesh::makePlane({0.0f, 1.0f, 0.0f}));
 
 	graphics::Material cube_material(graphics::RenderMode::untextured_lit,
-	                                 glm::vec3(1.0f, 1.0f, 1.0f),
-	                                 glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
+	                                 glm::vec3(1.0f, 1.0f, 1.0f));
 
-	graphics::Material floor_material(graphics::RenderMode::untextured_lit,
+	graphics::Material floor_material(graphics::RenderMode::textured_lit,
 	                                  glm::vec3(1.0f, 1.0f, 1.0f),
-	                                  glm::vec3(1.0f, 1.0f, 1.0f), 32.0f);
+	                                  glm::vec3(1.0f, 1.0f, 1.0f),
+	                                  32.0f,
+	                                  texture_sampler, floor_texture);
 
 	std::vector<graphics::Model> models{
 		{
@@ -102,12 +112,16 @@ int main() try {
 		input::cache();
 		glfwPollEvents();
 
-		camera.rotation.x -= input::mouse::cursorDelta().y * 0.01f;
+		static glm::vec3 camera_forward_speed{};
+		static glm::vec3 camera_right_speed{};
+		static glm::vec3 camera_up_speed{};
+
+		camera.rotation.x -= input::mouse::cursorDelta().y * 0.005f;
 		camera.rotation.x = glm::clamp(camera.rotation.x,
 		                               -glm::pi<float>() / 2.0f,
 		                               glm::pi<float>() / 2.0f);
 
-		camera.rotation.y -= input::mouse::cursorDelta().x * 0.01f;
+		camera.rotation.y -= input::mouse::cursorDelta().x * 0.005f;
 		camera.rotation.y = glm::mod(camera.rotation.y, 2.0f * glm::pi<float>());
 
 		glm::quat orientation = camera.calculateOrientation();
@@ -121,28 +135,33 @@ int main() try {
 		glm::vec3 right = glm::normalize(glm::cross(forward, up));
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::w)) {
-			camera.position += forward * 0.1f;
+			camera_forward_speed = forward * 0.1f;
 		}
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::s)) {
-			camera.position -= forward * 0.1f;
+			camera_forward_speed = forward * -0.1f;
 		}
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::a)) {
-			camera.position -= right * 0.1f;
+			camera_right_speed = right * -0.1f;
 		}
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::d)) {
-			camera.position += right * 0.1f;
+			camera_right_speed = right * 0.1f;
 		}
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::q)) {
-			camera.position += up * 0.1f;
+			camera_up_speed = up * 0.1f;
 		}
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::z)) {
-			camera.position -= up * 0.1f;
+			camera_up_speed = up * -0.1f;
 		}
+
+		camera.position += camera_forward_speed + camera_right_speed + camera_up_speed;
+		camera_forward_speed *= 0.8f;
+		camera_right_speed *= 0.8f;
+		camera_up_speed *= 0.8f;
 
 		float t = float(glfwGetTime());
 
@@ -166,6 +185,9 @@ int main() try {
 
 	delete plane_mesh;
 	delete cube_mesh;
+
+	delete floor_texture;
+	delete texture_sampler;
 
 	graphics::utils::shutdown();
 	graphics::shutdown();

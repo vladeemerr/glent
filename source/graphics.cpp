@@ -7,137 +7,9 @@ namespace glint::graphics {
 
 namespace {
 
+#include "graphics_shaders.hpp"
+
 constexpr size_t max_light_count = 16;
-
-constexpr char untextured_unlit_vertex_shader_code[] = R"(
-#version 310 es
-
-layout(location = 0) in vec3 v_position;
-
-layout(std140, binding = 0) uniform CameraUniforms {
-	mat4 view_projection;
-	vec3 view_position;
-};
-
-layout(std140, binding = 1) uniform ModelUniforms {
-	mat4 transform;
-	vec4 color;
-};
-
-void main() {
-	gl_Position = view_projection * transform * vec4(v_position, 1.0f);
-}
-)";
-
-constexpr char untextured_unlit_fragment_shader_code[] = R"(
-#version 310 es
-precision mediump float;
-
-out vec4 frag_color;
-
-layout(std140, binding = 1) uniform ModelUniforms {
-	mat4 transform;
-	vec4 color;
-};
-
-void main() {
-	frag_color = color;
-}
-)";
-
-constexpr char untextured_lit_vertex_shader_code[] = R"(
-#version 310 es
-
-struct Light {
-	mediump vec4 position_size;
-	mediump vec3 color;
-};
-
-layout(location = 0) in vec3 v_position;
-layout(location = 1) in vec3 v_normal;
-
-out vec3 f_position;
-out vec3 f_normal;
-
-layout(std140, binding = 0) uniform CameraUniforms {
-	mat4 view_projection;
-	vec3 view_position;
-	vec3 ambience;
-	int light_count;
-	Light lights[16];
-};
-
-layout(std140, binding = 1) uniform ModelUniforms {
-	mat4 transform;
-	vec3 albedo_color;
-	vec3 specular_color;
-	float shininess;
-};
-
-void main() {
-	vec4 position = transform * vec4(v_position, 1.0f);
-	vec4 normal = transform * vec4(v_normal, 0.0f);
-
-	gl_Position = view_projection * position;
-	f_position = position.xyz;
-	f_normal = normalize(normal.xyz);
-}
-)";
-
-constexpr char untextured_lit_fragment_shader_code[] = R"(
-#version 310 es
-precision mediump float;
-
-struct Light {
-	vec4 position_size;
-	vec3 color;
-};
-
-in vec3 f_position;
-in vec3 f_normal;
-
-out vec4 frag_color;
-
-layout(std140, binding = 0) uniform CameraUniforms {
-	mat4 view_projection;
-	vec3 view_position;
-	vec3 ambience;
-	int light_count;
-	Light lights[16];
-};
-
-layout(std140, binding = 1) uniform ModelUniforms {
-	mat4 transform;
-	vec3 albedo_color;
-	vec3 specular_color;
-	float shininess;
-};
-
-void main() {
-	vec3 normal = normalize(f_normal);
-	vec3 view_direction = normalize(view_position - f_position);
-
-	vec3 color = ambience * albedo_color;
-	for (int i = 0; i < light_count; ++i) {
-		Light light = lights[i];
-
-		vec3 light_direction = normalize(light.position_size.xyz - f_position);
-		vec3 half_vector = normalize(view_direction + light_direction);
-		float light_distance = distance(light.position_size.xyz, f_position);
-
-		float coeff = max(dot(normal, light_direction), 0.0f);
-		float falloff = (light.position_size.w * light.position_size.w) /
-		                (1.0f + light_distance * light_distance);
-
-		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), shininess) *
-		                specular_color;
-
-		color += (specular + albedo_color) * coeff * light.color * falloff;
-	}
-	
-	frag_color = vec4(color, 1.0f);
-}
-)";
 
 struct CameraUniforms {
 	glm::mat4 view_projection;
@@ -195,6 +67,17 @@ void setup() {
 		untextured_lit_vertex_shader, untextured_lit_fragment_shader,
 		solid_depth_stencil_state, solid_blend_state);
 
+	gl::Shader textured_lit_vertex_shader(GL_VERTEX_SHADER,
+	                                      textured_lit_vertex_shader_code);
+
+	gl::Shader textured_lit_fragment_shader(GL_FRAGMENT_SHADER,
+	                                        textured_lit_fragment_shader_code);
+
+	pipelines[static_cast<size_t>(RenderMode::textured_lit)] = new gl::Pipeline(
+		solid_primitive_state, attributes,
+		textured_lit_vertex_shader, textured_lit_fragment_shader,
+		solid_depth_stencil_state, solid_blend_state);
+
 	camera_uniform_buffer = new gl::Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW,
 	                                       sizeof(CameraUniforms));
 
@@ -207,6 +90,7 @@ void setup() {
 void shutdown() {
 	delete model_uniform_buffer;
 	delete camera_uniform_buffer;
+	delete pipelines[static_cast<size_t>(RenderMode::textured_lit)];
 	delete pipelines[static_cast<size_t>(RenderMode::untextured_lit)];
 	delete pipelines[static_cast<size_t>(RenderMode::untextured_unlit)];
 }
@@ -224,11 +108,17 @@ void render(const std::span<const Model> models,
 	camera_uniform_buffer->assign(sizeof(CameraUniforms), &camera_uniforms);
 	
 	for (const auto& model : models) {
-		gl::setPipeline(model.material.pipeline());
+		const auto& material = model.material;
+
+		auto mode = material.renderMode();
+
+		gl::setPipeline(*pipelines[static_cast<size_t>(mode)]);
 		gl::setUniformBuffer(*camera_uniform_buffer, 0);
 		gl::setUniformBuffer(*model_uniform_buffer, 1);
 
-		const auto& material = model.material;
+		if (mode == RenderMode::textured_lit) {
+			gl::setTexture(material.albedoTexture(), material.textureSampler(), 0);
+		}
 
 		ModelUniforms model_uniforms{
 			.transform = model.transform,
@@ -245,13 +135,6 @@ void render(const std::span<const Model> models,
 		gl::draw(model.mesh.count());
 	}
 }
-
-Material::Material(RenderMode mode,
-                   glm::vec3 albedo_color,
-                   glm::vec3 specular_color,
-                   float shininess)
-: albedo_color{albedo_color}, specular_color{specular_color}, shininess{shininess},
-  mode_{mode}, pipeline_{pipelines[static_cast<size_t>(mode)]} {}
 
 Mesh Mesh::makeCube() {
 	const Vertex vertices[] = {

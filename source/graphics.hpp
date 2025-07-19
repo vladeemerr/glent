@@ -16,6 +16,7 @@ namespace glint::graphics {
 enum class RenderMode {
 	untextured_unlit,
 	untextured_lit,
+	textured_lit,
 	count,
 };
 
@@ -54,10 +55,29 @@ public:
 	Material(RenderMode mode,
 	         glm::vec3 albedo_color,
 	         glm::vec3 specular_color = glm::vec3(0.0f, 0.0f, 0.0f),
-	         float shininess = 1.0f);
+	         float shininess = 1.0f,
+	         const gl::Sampler* texture_sampler = nullptr,
+	         const gl::Texture* albedo_texture = nullptr)
+	: albedo_color{albedo_color},
+	  specular_color{specular_color},
+	  shininess{shininess},
+	  mode_{mode},
+	  texture_sampler_{texture_sampler},
+	  albedo_texture_{albedo_texture} {}
 
 	RenderMode renderMode() const noexcept { return mode_; }
-	gl::Pipeline& pipeline() const & noexcept { return *pipeline_; };
+
+	const gl::Texture& albedoTexture() const & noexcept {
+		assert(mode_ == RenderMode::textured_lit &&
+		       albedo_texture_ != nullptr);
+		return *albedo_texture_;
+	}
+
+	const gl::Sampler& textureSampler() const & noexcept {
+		assert(mode_ == RenderMode::textured_lit &&
+		       texture_sampler_ != nullptr);
+		return *texture_sampler_;
+	}
 
 public:
 	glm::vec3 albedo_color;
@@ -66,7 +86,8 @@ public:
 
 private:
 	RenderMode mode_;
-	gl::Pipeline* pipeline_;
+	const gl::Sampler* texture_sampler_;
+	const gl::Texture* albedo_texture_;
 };
 
 struct Model final {
