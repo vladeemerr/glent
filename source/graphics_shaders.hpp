@@ -61,6 +61,7 @@ layout(std140, binding = 1) uniform ModelUniforms {
 	vec3 albedo_color;
 	vec3 specular_color;
 	float shininess;
+	float emissiveness;
 };
 
 void main() {
@@ -100,6 +101,7 @@ layout(std140, binding = 1) uniform ModelUniforms {
 	vec3 albedo_color;
 	vec3 specular_color;
 	float shininess;
+	float emissiveness;
 };
 
 void main() {
@@ -123,7 +125,9 @@ void main() {
 
 		color += (specular + albedo_color) * coeff * light.color * falloff;
 	}
-	
+
+	color += albedo_color * emissiveness;
+
 	frag_color = vec4(color, 1.0f);
 }
 )";
@@ -157,6 +161,7 @@ layout(std140, binding = 1) uniform ModelUniforms {
 	vec3 albedo_color;
 	vec3 specular_color;
 	float shininess;
+	float emissiveness;
 };
 
 void main() {
@@ -200,13 +205,16 @@ layout(std140, binding = 1) uniform ModelUniforms {
 	vec3 albedo_color;
 	vec3 specular_color;
 	float shininess;
+	float emissiveness;
 };
 
 void main() {
 	vec3 normal = normalize(f_normal);
 	vec3 view_direction = normalize(view_position - f_position);
 
-	vec3 color = ambience * albedo_color;
+	vec3 albedo = texture(albedo_texture, f_uv).rgb * albedo_color;
+
+	vec3 color = ambience * albedo;
 	for (int i = 0; i < light_count; ++i) {
 		Light light = lights[i];
 
@@ -221,11 +229,11 @@ void main() {
 		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), shininess) *
 		                specular_color;
 
-		color += (specular + albedo_color) * coeff * light.color * falloff;
+		color += (specular + albedo) * coeff * light.color * falloff;
 	}
 
-	vec4 albedo = texture(albedo_texture, f_uv);
-	
-	frag_color = vec4(albedo.rgb * color, 1.0f);
+	color += albedo * emissiveness;
+
+	frag_color = vec4(color, 1.0f);
 }
 )";

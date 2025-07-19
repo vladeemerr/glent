@@ -24,6 +24,7 @@ struct ModelUniforms {
 	GLSL_STD140_ALIGN glm::vec3 albedo_color;
 	GLSL_STD140_ALIGN glm::vec3 specular_color;
 	float shininess;
+	float emissiveness;
 };
 
 gl::Pipeline* pipelines[static_cast<size_t>(RenderMode::count)];
@@ -110,14 +111,14 @@ void render(const std::span<const Model> models,
 	for (const auto& model : models) {
 		const auto& material = model.material;
 
-		auto mode = material.renderMode();
-
-		gl::setPipeline(*pipelines[static_cast<size_t>(mode)]);
+		gl::setPipeline(*pipelines[static_cast<size_t>(material.render_mode)]);
 		gl::setUniformBuffer(*camera_uniform_buffer, 0);
 		gl::setUniformBuffer(*model_uniform_buffer, 1);
 
-		if (mode == RenderMode::textured_lit) {
-			gl::setTexture(material.albedoTexture(), material.textureSampler(), 0);
+		if (material.render_mode == RenderMode::textured_lit) {
+			assert(material.texture_sampler != nullptr &&
+			       material.albedo_texture != nullptr);
+			gl::setTexture(*material.albedo_texture, *material.texture_sampler, 0);
 		}
 
 		ModelUniforms model_uniforms{
@@ -126,6 +127,7 @@ void render(const std::span<const Model> models,
 			.specular_color = material.specular_color *
 			                  ((material.shininess + 8.0f) / (8.0f * glm::pi<float>())),
 			.shininess = material.shininess,
+			.emissiveness = material.emissiveness,
 		};
 		model_uniform_buffer->assign(sizeof(ModelUniforms), &model_uniforms);
 		

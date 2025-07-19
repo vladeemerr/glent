@@ -80,14 +80,18 @@ int main() try {
 	auto* cube_mesh = new graphics::Mesh(graphics::Mesh::makeCube());
 	auto* plane_mesh = new graphics::Mesh(graphics::Mesh::makePlane({0.0f, 1.0f, 0.0f}));
 
-	graphics::Material cube_material(graphics::RenderMode::untextured_lit,
-	                                 glm::vec3(1.0f, 1.0f, 1.0f));
+	graphics::Material cube_material{
+		.render_mode = graphics::RenderMode::untextured_lit,
+		.emissiveness = 2.0f,
+	};
 
-	graphics::Material floor_material(graphics::RenderMode::textured_lit,
-	                                  glm::vec3(1.0f, 1.0f, 1.0f),
-	                                  glm::vec3(1.0f, 1.0f, 1.0f),
-	                                  32.0f,
-	                                  texture_sampler, floor_texture);
+	graphics::Material floor_material{
+		.render_mode = graphics::RenderMode::textured_lit,
+		.specular_color = glm::vec3(1.0f),
+		.shininess = 32.0f,
+		.texture_sampler = texture_sampler,
+		.albedo_texture = floor_texture,
+	};
 
 	std::vector<graphics::Model> models{
 		{
@@ -136,25 +140,19 @@ int main() try {
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::w)) {
 			camera_forward_speed = forward * 0.1f;
-		}
-
-		if (input::keyboard::isKeyDown(input::keyboard::Key::s)) {
+		} else if (input::keyboard::isKeyDown(input::keyboard::Key::s)) {
 			camera_forward_speed = forward * -0.1f;
 		}
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::a)) {
 			camera_right_speed = right * -0.1f;
-		}
-
-		if (input::keyboard::isKeyDown(input::keyboard::Key::d)) {
+		} else if (input::keyboard::isKeyDown(input::keyboard::Key::d)) {
 			camera_right_speed = right * 0.1f;
 		}
 
 		if (input::keyboard::isKeyDown(input::keyboard::Key::q)) {
 			camera_up_speed = up * 0.1f;
-		}
-
-		if (input::keyboard::isKeyDown(input::keyboard::Key::z)) {
+		} else if (input::keyboard::isKeyDown(input::keyboard::Key::z)) {
 			camera_up_speed = up * -0.1f;
 		}
 

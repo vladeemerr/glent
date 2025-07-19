@@ -50,44 +50,14 @@ private:
 	uint32_t count_;
 };
 
-class Material final {
-public:
-	Material(RenderMode mode,
-	         glm::vec3 albedo_color,
-	         glm::vec3 specular_color = glm::vec3(0.0f, 0.0f, 0.0f),
-	         float shininess = 1.0f,
-	         const gl::Sampler* texture_sampler = nullptr,
-	         const gl::Texture* albedo_texture = nullptr)
-	: albedo_color{albedo_color},
-	  specular_color{specular_color},
-	  shininess{shininess},
-	  mode_{mode},
-	  texture_sampler_{texture_sampler},
-	  albedo_texture_{albedo_texture} {}
-
-	RenderMode renderMode() const noexcept { return mode_; }
-
-	const gl::Texture& albedoTexture() const & noexcept {
-		assert(mode_ == RenderMode::textured_lit &&
-		       albedo_texture_ != nullptr);
-		return *albedo_texture_;
-	}
-
-	const gl::Sampler& textureSampler() const & noexcept {
-		assert(mode_ == RenderMode::textured_lit &&
-		       texture_sampler_ != nullptr);
-		return *texture_sampler_;
-	}
-
-public:
-	glm::vec3 albedo_color;
-	glm::vec3 specular_color;
-	float shininess;
-
-private:
-	RenderMode mode_;
-	const gl::Sampler* texture_sampler_;
-	const gl::Texture* albedo_texture_;
+struct Material final {
+	RenderMode render_mode;
+	glm::vec3 albedo_color = glm::vec3(1.0f);
+	glm::vec3 specular_color = glm::vec3(0.0f);
+	float shininess = 1.0f;
+	float emissiveness = 0.0f;
+	const gl::Sampler* texture_sampler = nullptr;
+	const gl::Texture* albedo_texture = nullptr;
 };
 
 struct Model final {
@@ -103,7 +73,6 @@ struct Light final {
 };
 
 struct Camera final {
-public:
 	static constexpr float default_fov = 70.0f;
 	static constexpr float default_near_plane = 0.001f;
 	static constexpr float default_far_plane = 1000.0f;
