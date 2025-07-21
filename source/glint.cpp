@@ -120,6 +120,22 @@ int main() try {
 		static glm::vec3 camera_right_speed{};
 		static glm::vec3 camera_up_speed{};
 
+		if (input::keyboard::isKeyDown(input::keyboard::Key::up)) {
+			camera.rotation.x += 0.05f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::down)) {
+			camera.rotation.x -= 0.05f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::right)) {
+			camera.rotation.y -= 0.05f;
+		}
+
+		if (input::keyboard::isKeyDown(input::keyboard::Key::left)) {
+			camera.rotation.y += 0.05f;
+		}
+
 		camera.rotation.x -= input::mouse::cursorDelta().y * 0.005f;
 		camera.rotation.x = glm::clamp(camera.rotation.x,
 		                               -glm::pi<float>() / 2.0f,
@@ -128,13 +144,8 @@ int main() try {
 		camera.rotation.y -= input::mouse::cursorDelta().x * 0.005f;
 		camera.rotation.y = glm::mod(camera.rotation.y, 2.0f * glm::pi<float>());
 
-		glm::quat orientation = camera.calculateOrientation();
-		glm::quat forward_orient = orientation *
-		                           glm::quat(0.0f, {0.0f, 0.0f, -1.0f}) *
-		                           glm::conjugate(orientation);
-		glm::vec3 forward = glm::normalize(glm::vec3(forward_orient.x,
-		                                             forward_orient.y,
-		                                             forward_orient.z));
+		glm::mat3 rotation = mat3_cast(camera.calculateOrientation());
+		glm::vec3 forward = glm::normalize(rotation * glm::vec3(0.0f, 0.0f, -1.0f));
 		glm::vec3 up(0.0f, 1.0f, 0.0f);
 		glm::vec3 right = glm::normalize(glm::cross(forward, up));
 

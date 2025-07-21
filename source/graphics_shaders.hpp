@@ -237,3 +237,39 @@ void main() {
 	frag_color = vec4(color, 1.0f);
 }
 )";
+
+constexpr char sky_vertex_shader_code[] = R"(
+#version 310 es
+
+layout(location = 0) in vec2 v_position;
+
+out vec3 f_direction;
+
+layout(std140, binding = 0) uniform SkyUniforms {
+	mat4 view;
+	vec2 viewport;
+};
+
+void main() {
+	vec2 uv = vec2(-v_position.x, -v_position.y * viewport.y / viewport.x);
+	vec4 position = view * vec4(uv, 1.0f, 1.0f);
+
+	gl_Position = vec4(v_position, 0.0f, 1.0f);
+	f_direction = normalize(position.xyz);
+}
+)";
+
+constexpr char sky_fragment_shader_code[] = R"(
+#version 310 es
+precision mediump float;
+
+in vec3 f_direction;
+
+out vec4 frag_color;
+
+void main() {
+	const vec3 above = vec3(0.52f, 0.81f, 0.92f);
+	const vec3 below = vec3(0.05f, 0.05f, 0.05f);
+	frag_color = vec4(mix(above, below, smoothstep(0.95f, 1.05f, f_direction.y + 1.0f)), 1.0f);
+}
+)";

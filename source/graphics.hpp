@@ -98,8 +98,8 @@ struct Camera final {
 	}
 
 	glm::mat4 calculatePerspective() const {
-		glm::mat4 perspective  = glm::perspective(fov, viewport.x / viewport.y,
-		                                          default_near_plane, default_far_plane);
+		glm::mat4 perspective = glm::perspective(fov, viewport.x / viewport.y,
+		                                         default_near_plane, default_far_plane);
 		glm::mat4 view = calculateView();
 		return perspective * view;
 	}

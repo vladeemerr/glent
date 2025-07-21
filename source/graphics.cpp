@@ -27,11 +27,20 @@ struct ModelUniforms {
 	float emissiveness;
 };
 
+struct SkyUniforms {
+	glm::mat4 view;
+	glm::vec2 viewport;
+};
+
 gl::Pipeline* pipelines[static_cast<size_t>(RenderMode::count)];
 gl::Buffer* camera_uniform_buffer;
 gl::Buffer* model_uniform_buffer;
 
 CameraUniforms camera_uniforms;
+
+gl::Buffer* sky_vertex_buffer;
+gl::Buffer* sky_uniform_buffer;
+gl::Pipeline* sky_pipeline;
 
 } // namespace
 
@@ -86,9 +95,43 @@ void setup() {
 	                                      sizeof(ModelUniforms));
 
 	camera_uniforms.ambience = {0.3f, 0.3f, 0.3f};
+
+	/* Sky */
+
+	const gl::VertexAttribute sky_vertex_attributes[] = {
+		{0, GL_FLOAT, 2, false},
+	};
+
+	const glm::vec2 sky_vertices[] = {
+		{-1.0f, 1.0f},
+		{-1.0f, -1.0f},
+		{1.0f, 1.0f},
+		{1.0f, -1.0f},
+	};
+
+	sky_vertex_buffer = new gl::Buffer(GL_ARRAY_BUFFER, GL_STATIC_DRAW,
+	                                   sizeof(sky_vertices), sky_vertices);
+
+	sky_uniform_buffer = new gl::Buffer(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW,
+	                                    sizeof(SkyUniforms));
+
+	gl::Shader sky_vertex_shader(GL_VERTEX_SHADER, sky_vertex_shader_code);
+	gl::Shader sky_fragment_shader(GL_FRAGMENT_SHADER, sky_fragment_shader_code);
+
+	sky_pipeline = new gl::Pipeline(
+		gl::PrimitiveState{.mode = GL_TRIANGLE_STRIP, .cull_mode = GL_NONE},
+		sky_vertex_attributes,
+		sky_vertex_shader,
+		sky_fragment_shader,
+		gl::DepthStencilState{.depth_write = false},
+		gl::BlendState{.enable = false});
 }
 
 void shutdown() {
+	delete sky_pipeline;
+	delete sky_uniform_buffer;
+	delete sky_vertex_buffer;
+	
 	delete model_uniform_buffer;
 	delete camera_uniform_buffer;
 	delete pipelines[static_cast<size_t>(RenderMode::textured_lit)];
@@ -99,7 +142,18 @@ void shutdown() {
 void render(const std::span<const Model> models,
             const Camera& camera,
             const std::span<const Light> lights) {
-	graphics::gl::clear(0.05f, 0.05f, 0.05f, 1.0f);
+	gl::clear(0.0f, 0.0f, 0.0f, 1.0f);
+
+	SkyUniforms sky_uniforms{
+		.view = glm::mat4(mat3_cast(camera.calculateOrientation())),
+		.viewport = camera.viewport,
+	};
+	sky_uniform_buffer->assign(sizeof(SkyUniforms), &sky_uniforms);
+
+	gl::setPipeline(*sky_pipeline);
+	gl::setVertexBuffer(*sky_vertex_buffer);
+	gl::setUniformBuffer(*sky_uniform_buffer, 0);
+	gl::draw(4);
 
 	camera_uniforms.view_projection = camera.calculatePerspective();
 	camera_uniforms.view_position = camera.position;
