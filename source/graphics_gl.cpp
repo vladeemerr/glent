@@ -68,6 +68,21 @@ inline GLenum typeFromInternalFormat(GLenum format) {
 	return 0;
 }
 
+inline GLenum depthStencilAttachmentTypeFromFormat(GLenum format) {
+	switch (format) {
+		case GL_DEPTH_COMPONENT16:
+		case GL_DEPTH_COMPONENT24:
+		case GL_DEPTH_COMPONENT32F:
+			return GL_DEPTH_ATTACHMENT;
+
+		case GL_DEPTH24_STENCIL8:
+		case GL_DEPTH32F_STENCIL8:
+			return GL_DEPTH_STENCIL_ATTACHMENT;
+	}
+	
+	return 0;
+}
+
 } // namespace
 
 Buffer::Buffer(GLenum type, GLenum usage, size_t size, const void* data)
@@ -153,7 +168,12 @@ Texture::Texture(GLenum format, uint32_t width, uint32_t height, const void* dat
 		                formatFromInternalFormat(format),
 		                typeFromInternalFormat(format),
 		                data);
+
+		if (width == height && (width & (width - 1)) == 0) {
+			glGenerateMipmap(GL_TEXTURE_2D);
+		}
 	}
+
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -173,6 +193,7 @@ Sampler::Sampler(const Descriptor& descriptor) {
 	glSamplerParameteri(handle_, GL_TEXTURE_MIN_LOD, descriptor.min_lod);
 	glSamplerParameteri(handle_, GL_TEXTURE_MAX_LOD, descriptor.max_lod);
 	glSamplerParameteri(handle_, GL_TEXTURE_COMPARE_FUNC, descriptor.compare_func);
+	glSamplerParameterf(handle_, GL_TEXTURE_MAX_ANISOTROPY_EXT, descriptor.anisotropy);
 }
 
 Sampler::~Sampler() {
@@ -242,6 +263,47 @@ Pipeline::~Pipeline() {
 	glDeleteVertexArrays(1, &vertex_array_);
 }
 
+Framebuffer::Framebuffer(const std::span<gl::Texture*> color_attachments,
+                         gl::Texture* depth_stencil_attachment) {
+	glGenFramebuffers(1, &handle_);
+	glBindFramebuffer(GL_FRAMEBUFFER, handle_);
+
+	for (size_t i = 0; i < color_attachments.size(); ++i) {
+		const auto attachment = color_attachments[i];
+
+		if (attachment == nullptr) {
+			continue;
+		}
+
+		glFramebufferTexture2D(GL_FRAMEBUFFER,
+		                       GL_COLOR_ATTACHMENT0 + i,
+		                       attachment->type(),
+		                       attachment->handle(), 0);
+	}
+
+	static constexpr GLenum draw_buffers[] = {
+		GL_COLOR_ATTACHMENT0,
+		GL_COLOR_ATTACHMENT1,
+		GL_COLOR_ATTACHMENT2,
+		GL_COLOR_ATTACHMENT3,
+	};
+
+	glDrawBuffers(color_attachments.size(), draw_buffers);
+
+	if (depth_stencil_attachment != nullptr) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER,
+		                       depthStencilAttachmentTypeFromFormat(depth_stencil_attachment->format()),
+		                       depth_stencil_attachment->type(),
+		                       depth_stencil_attachment->handle(), 0);
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+Framebuffer::~Framebuffer() {
+	glDeleteFramebuffers(1, &handle_);
+}
+
 void setup(uint32_t width, uint32_t height) {
 	glEnable(GL_DEBUG_OUTPUT_KHR);
 	glDebugMessageCallbackKHR(glDebugCallback, 0);
@@ -261,6 +323,10 @@ glm::vec2 viewport() {
 void clear(float red, float green, float blue, float alpha) {
 	glClearColor(red, green, blue, alpha);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void setFramebuffer(const Framebuffer& framebuffer) {
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.framebuffer());
 }
 
 void setPipeline(const Pipeline& pipeline) {

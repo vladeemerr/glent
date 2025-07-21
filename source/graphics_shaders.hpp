@@ -47,9 +47,11 @@ layout(location = 1) in vec3 v_normal;
 
 out vec3 f_position;
 out vec3 f_normal;
+out vec4 f_ray_position;
 
 layout(std140, binding = 0) uniform CameraUniforms {
 	mat4 view_projection;
+	mat4 shadow_matrix;
 	vec3 view_position;
 	vec3 ambience;
 	int light_count;
@@ -71,6 +73,7 @@ void main() {
 	gl_Position = view_projection * position;
 	f_position = position.xyz;
 	f_normal = normalize(normal.xyz);
+	f_ray_position = shadow_matrix * position;
 }
 )";
 
@@ -85,11 +88,15 @@ struct Light {
 
 in vec3 f_position;
 in vec3 f_normal;
+in vec4 f_ray_position;
 
 out vec4 frag_color;
 
+layout(binding = 1) uniform sampler2D shadow_map;
+
 layout(std140, binding = 0) uniform CameraUniforms {
 	mat4 view_projection;
+	mat4 shadow_matrix;
 	vec3 view_position;
 	vec3 ambience;
 	int light_count;
@@ -108,6 +115,11 @@ void main() {
 	vec3 normal = normalize(f_normal);
 	vec3 view_direction = normalize(view_position - f_position);
 
+	vec3 ray_position = f_ray_position.xyz / f_ray_position.w;
+	ray_position = 0.5f + ray_position * 0.5f;
+	float depth = texture(shadow_map, ray_position.xy).r;
+	float shadow = ray_position.z > depth ? 0.0f : 1.0f;
+
 	vec3 color = ambience * albedo_color;
 	for (int i = 0; i < light_count; ++i) {
 		Light light = lights[i];
@@ -123,7 +135,7 @@ void main() {
 		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), shininess) *
 		                specular_color;
 
-		color += (specular + albedo_color) * coeff * light.color * falloff;
+		color += (specular + albedo_color) * coeff * light.color * falloff * shadow;
 	}
 
 	color += albedo_color * emissiveness;
@@ -147,9 +159,11 @@ layout(location = 2) in vec2 v_uv;
 out vec3 f_position;
 out vec3 f_normal;
 out vec2 f_uv;
+out vec4 f_ray_position;
 
 layout(std140, binding = 0) uniform CameraUniforms {
 	mat4 view_projection;
+	mat4 shadow_matrix;
 	vec3 view_position;
 	vec3 ambience;
 	int light_count;
@@ -172,6 +186,7 @@ void main() {
 	f_position = position.xyz;
 	f_normal = normalize(normal.xyz);
 	f_uv = v_uv;
+	f_ray_position = shadow_matrix * position;
 }
 )";
 
@@ -187,13 +202,16 @@ struct Light {
 in vec3 f_position;
 in vec3 f_normal;
 in vec2 f_uv;
+in vec4 f_ray_position;
 
 out vec4 frag_color;
 
 layout(binding = 0) uniform sampler2D albedo_texture;
+layout(binding = 1) uniform sampler2D shadow_map;
 
 layout(std140, binding = 0) uniform CameraUniforms {
 	mat4 view_projection;
+	mat4 shadow_matrix;
 	vec3 view_position;
 	vec3 ambience;
 	int light_count;
@@ -214,6 +232,20 @@ void main() {
 
 	vec3 albedo = texture(albedo_texture, f_uv).rgb * albedo_color;
 
+	vec3 ray_position = f_ray_position.xyz / f_ray_position.w;
+	ray_position = 0.5f + ray_position * 0.5f;
+	float shadow = 0.0f;
+
+	vec2 texel_size = 1.0f / vec2(textureSize(shadow_map, 0));
+	for (int y = -1; y <= 1; ++y) {
+		for (int x = -1; x <= 1; ++x) {
+			float depth = texture(shadow_map, ray_position.xy + vec2(x, y) * texel_size).r;
+			shadow += ray_position.z > depth ? 1.0f : 0.0f;
+		}
+	}
+
+	shadow = 1.0f - shadow / 9.0f;
+
 	vec3 color = ambience * albedo;
 	for (int i = 0; i < light_count; ++i) {
 		Light light = lights[i];
@@ -229,7 +261,7 @@ void main() {
 		vec3 specular = pow(max(dot(normal, half_vector), 0.0f), shininess) *
 		                specular_color;
 
-		color += (specular + albedo) * coeff * light.color * falloff;
+		color += (specular + albedo) * coeff * light.color * falloff * shadow;
 	}
 
 	color += albedo * emissiveness;
@@ -272,4 +304,29 @@ void main() {
 	const vec3 below = vec3(0.05f, 0.05f, 0.05f);
 	frag_color = vec4(mix(above, below, smoothstep(0.95f, 1.05f, f_direction.y + 1.0f)), 1.0f);
 }
+)";
+
+constexpr char shadow_map_vertex_shader_code[] = R"(
+#version 310 es
+
+layout(location = 0) in vec3 v_position;
+
+layout(std140, binding = 0) uniform ShadowMapUniforms {
+	mat4 view_projection;
+};
+
+layout(std140, binding = 1) uniform ModelUniforms {
+	mat4 transform;
+};
+
+void main() {
+	gl_Position = view_projection * transform * vec4(v_position, 1.0f);
+}
+)";
+
+constexpr char shadow_map_fragment_shader_code[] = R"(
+#version 310 es
+precision mediump float;
+
+void main() {}
 )";

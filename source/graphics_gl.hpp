@@ -102,6 +102,7 @@ public:
 	Texture& operator=(Texture&&) noexcept = delete;
 
 	GLenum type() const noexcept { return type_; }
+	GLenum format() const noexcept { return format_; }
 	GLuint handle() const noexcept { return handle_; }
 
 private:
@@ -119,9 +120,10 @@ public:
 		GLenum address_mode_w = GL_CLAMP_TO_EDGE;
 		GLenum min_filter = GL_NEAREST;
 		GLenum mag_filter = GL_LINEAR;
-		GLenum min_lod = -1000;
-		GLenum max_lod = 1000;
+		GLint min_lod = -1000;
+		GLint max_lod = 1000;
 		GLenum compare_func = GL_NEVER;
+		GLfloat anisotropy = 1.0f;
 	};
 
 public:
@@ -174,11 +176,36 @@ private:
 	GLuint program_;
 };
 
+class Framebuffer final {
+public:
+	Framebuffer(const std::span<gl::Texture*> color_attachments,
+	            gl::Texture* depth_stencil_attachment);
+	~Framebuffer();
+
+	Framebuffer(const Framebuffer&) = delete;
+	Framebuffer(Framebuffer&&) noexcept = delete;
+
+	Framebuffer& operator=(const Framebuffer&) = delete;
+	Framebuffer& operator=(Framebuffer&&) noexcept = delete;
+
+	GLuint framebuffer() const noexcept { return handle_; }
+
+	static Framebuffer main() { return {}; }
+
+private:
+	Framebuffer()
+	: handle_{0} {}
+
+private:
+	GLuint handle_;
+};
+
 void setup(uint32_t width, uint32_t height);
 void shutdown();
 
 glm::vec2 viewport();
 void clear(float red, float green, float blue, float alpha);
+void setFramebuffer(const Framebuffer& framebuffer);
 
 void setPipeline(const Pipeline&);
 void setVertexBuffer(const Buffer&);

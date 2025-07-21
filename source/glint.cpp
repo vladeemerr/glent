@@ -68,21 +68,37 @@ int main() try {
 		.position = glm::vec3{0.0f, 1.0f, 2.0f},
 	};
 
-	auto* texture_sampler = new graphics::gl::Sampler({});
+	auto* texture_sampler = new graphics::gl::Sampler({
+		.min_filter = GL_LINEAR_MIPMAP_LINEAR,
+		.anisotropy = 16.0f,
+	});
 
-	uint32_t texture_width, texture_height;
-	std::vector<uint8_t> texture_data;
-	lodepng::decode(texture_data, texture_width, texture_height, "./assets/texture.png");
-	auto* floor_texture = new graphics::gl::Texture(GL_RGBA8,
-	                                                texture_width, texture_height,
-	                                                texture_data.data());
+	auto* floor_texture = []() -> graphics::gl::Texture* {
+		uint32_t texture_width, texture_height;
+		std::vector<uint8_t> texture_data;
+		lodepng::decode(texture_data, texture_width, texture_height, "./assets/floor.png");
+		return new graphics::gl::Texture(GL_RGBA8,
+		                                 texture_width, texture_height,
+		                                 texture_data.data());
+	}();
+
+	auto* cube_texture = []() -> graphics::gl::Texture* {
+		uint32_t texture_width, texture_height;
+		std::vector<uint8_t> texture_data;
+		lodepng::decode(texture_data, texture_width, texture_height, "./assets/maxwell-nowhiskers.png");
+		return new graphics::gl::Texture(GL_RGBA8,
+		                                 texture_width, texture_height,
+		                                 texture_data.data());
+	}();
 
 	auto* cube_mesh = new graphics::Mesh(graphics::Mesh::makeCube());
 	auto* plane_mesh = new graphics::Mesh(graphics::Mesh::makePlane({0.0f, 1.0f, 0.0f}));
 
 	graphics::Material cube_material{
-		.render_mode = graphics::RenderMode::untextured_lit,
-		.emissiveness = 2.0f,
+		.render_mode = graphics::RenderMode::textured_lit,
+		.albedo_color = glm::vec3(1.0f),
+		.texture_sampler = texture_sampler,
+		.albedo_texture = cube_texture,
 	};
 
 	graphics::Material floor_material{
@@ -183,9 +199,6 @@ int main() try {
 		models[0].transform = glm::rotate(glm::translate(glm::mat4(1.0f), {0.0f, 1.0f, 0.0f}),
 		                                  t, glm::normalize(glm::vec3{glm::cos(t), glm::sin(t),
 		                                                              glm::cos(t) * glm::sin(t)}));
-		cube_material.albedo_color.r = 0.5f + glm::sin(t) * 0.5f;
-		cube_material.albedo_color.g = 0.5f + glm::cos(t) * 0.5f;
-		cube_material.albedo_color.b = 0.5f + glm::sin(t) * glm::cos(t) * 0.5f;
 
 		graphics::render(models, camera, lights);
 
