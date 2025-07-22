@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
+#include <numeric>
 
 namespace glint::graphics::gl {
 
@@ -161,7 +162,10 @@ Texture::Texture(GLenum format, uint32_t width, uint32_t height, const void* dat
 	glGenTextures(1, &handle_);
 	glBindTexture(GL_TEXTURE_2D, handle_);
 
-	glTexStorage2D(GL_TEXTURE_2D, 1, format, width, height);
+	bool is_power_of_two = width == height && (width & (width - 1)) == 0;
+
+	GLsizei levels = is_power_of_two ? std::bit_width(width) : 1;
+	glTexStorage2D(GL_TEXTURE_2D, levels, format, width, height);
 
 	if (data != nullptr) {
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
@@ -169,7 +173,7 @@ Texture::Texture(GLenum format, uint32_t width, uint32_t height, const void* dat
 		                typeFromInternalFormat(format),
 		                data);
 
-		if (width == height && (width & (width - 1)) == 0) {
+		if (is_power_of_two) {
 			glGenerateMipmap(GL_TEXTURE_2D);
 		}
 	}
@@ -192,8 +196,12 @@ Sampler::Sampler(const Descriptor& descriptor) {
 	glSamplerParameteri(handle_, GL_TEXTURE_MAG_FILTER, descriptor.mag_filter);
 	glSamplerParameteri(handle_, GL_TEXTURE_MIN_LOD, descriptor.min_lod);
 	glSamplerParameteri(handle_, GL_TEXTURE_MAX_LOD, descriptor.max_lod);
-	glSamplerParameteri(handle_, GL_TEXTURE_COMPARE_FUNC, descriptor.compare_func);
 	glSamplerParameterf(handle_, GL_TEXTURE_MAX_ANISOTROPY_EXT, descriptor.anisotropy);
+
+	if (descriptor.compare_func != GL_NONE) {
+		glSamplerParameteri(handle_, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glSamplerParameteri(handle_, GL_TEXTURE_COMPARE_FUNC, descriptor.compare_func);
+	}
 }
 
 Sampler::~Sampler() {

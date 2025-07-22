@@ -161,7 +161,11 @@ void setup() {
 	shadow_map_texture = new gl::Texture(GL_DEPTH_COMPONENT32F,
 	                                     shadow_map_size, shadow_map_size);
 
-	shadow_map_sampler = new gl::Sampler({});
+	shadow_map_sampler = new gl::Sampler({
+		.address_mode_u = GL_CLAMP_TO_EDGE,
+		.address_mode_v = GL_CLAMP_TO_EDGE,
+		.compare_func = GL_LEQUAL,
+	});
 
 	shadow_map_framebuffer = new gl::Framebuffer({}, shadow_map_texture);
 }
@@ -191,7 +195,7 @@ void render(const std::span<const Model> models,
 	glViewport(0, 0, shadow_map_size, shadow_map_size);
 	gl::clear(0.0f, 0.0f, 0.0f, 1.0f);
 
-	glm::mat4 shadow_projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 10.0f);
+	glm::mat4 shadow_projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 20.0f);
 	glm::mat4 shadow_view = glm::lookAt(glm::vec3(4.0f, 4.0f, 4.0f),
 	                                    glm::vec3(0.0f, 0.0f, 0.0f),
 	                                    glm::vec3(0.0f, 1.0f, 0.0f));

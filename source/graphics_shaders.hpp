@@ -207,7 +207,7 @@ in vec4 f_ray_position;
 out vec4 frag_color;
 
 layout(binding = 0) uniform sampler2D albedo_texture;
-layout(binding = 1) uniform sampler2D shadow_map;
+layout(binding = 1) uniform mediump sampler2DShadow shadow_map;
 
 layout(std140, binding = 0) uniform CameraUniforms {
 	mat4 view_projection;
@@ -234,17 +234,19 @@ void main() {
 
 	vec3 ray_position = f_ray_position.xyz / f_ray_position.w;
 	ray_position = 0.5f + ray_position * 0.5f;
-	float shadow = 0.0f;
+	ray_position.z += 1e-6f;
 
+	float accum = 0.0f;
 	vec2 texel_size = 1.0f / vec2(textureSize(shadow_map, 0));
 	for (int y = -1; y <= 1; ++y) {
 		for (int x = -1; x <= 1; ++x) {
-			float depth = texture(shadow_map, ray_position.xy + vec2(x, y) * texel_size).r;
-			shadow += ray_position.z > depth ? 1.0f : 0.0f;
+			vec3 p = ray_position;
+			p.xy += vec2(x, y) * texel_size;
+			accum += texture(shadow_map, p);
 		}
 	}
 
-	shadow = 1.0f - shadow / 9.0f;
+	float shadow = 0.5f + (accum / 18.0f);
 
 	vec3 color = ambience * albedo;
 	for (int i = 0; i < light_count; ++i) {

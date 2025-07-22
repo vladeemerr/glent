@@ -104,7 +104,7 @@ int main() try {
 	graphics::Material floor_material{
 		.render_mode = graphics::RenderMode::textured_lit,
 		.specular_color = glm::vec3(1.0f),
-		.shininess = 32.0f,
+		.shininess = 16.0f,
 		.texture_sampler = texture_sampler,
 		.albedo_texture = floor_texture,
 	};
@@ -123,9 +123,9 @@ int main() try {
 	};
 
 	std::vector<graphics::Light> lights{
-		{{}, 1.5f, {1.0f, 0.3f, 0.3f}},
-		{{}, 1.5f, {0.3f, 1.0f, 0.3f}},
-		{{}, 1.5f, {0.3f, 0.3f, 1.0f}},
+		{{}, 2.0f, {1.0f, 0.3f, 0.3f}},
+		{{}, 2.0f, {0.3f, 1.0f, 0.3f}},
+		{{}, 2.0f, {0.3f, 0.3f, 1.0f}},
 	};
 
 	while (!glfwWindowShouldClose(window)) {

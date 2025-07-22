@@ -122,7 +122,7 @@ public:
 		GLenum mag_filter = GL_LINEAR;
 		GLint min_lod = -1000;
 		GLint max_lod = 1000;
-		GLenum compare_func = GL_NEVER;
+		GLenum compare_func = GL_NONE;
 		GLfloat anisotropy = 1.0f;
 	};
 
