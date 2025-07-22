@@ -156,7 +156,7 @@ Shader::~Shader() {
 }
 
 Texture::Texture(GLenum format, uint32_t width, uint32_t height, const void* data)
-: type_{GL_TEXTURE_2D}, format_{format} {
+: format_{format}, size_{width, height}, type_{GL_TEXTURE_2D} {
 	assert(width != 0 && height != 0);
 	
 	glGenTextures(1, &handle_);
@@ -177,7 +177,6 @@ Texture::Texture(GLenum format, uint32_t width, uint32_t height, const void* dat
 			glGenerateMipmap(GL_TEXTURE_2D);
 		}
 	}
-
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -305,6 +304,12 @@ Framebuffer::Framebuffer(const std::span<gl::Texture*> color_attachments,
 		                       depth_stencil_attachment->handle(), 0);
 	}
 
+	if (!color_attachments.empty()) {
+		size_ = color_attachments[0]->size();
+	} else {
+		size_ = depth_stencil_attachment->size();
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -316,8 +321,6 @@ void setup(uint32_t width, uint32_t height) {
 	glEnable(GL_DEBUG_OUTPUT_KHR);
 	glDebugMessageCallbackKHR(glDebugCallback, 0);
 
-	glViewport(0, 0, width, height);
-
 	current_viewport_width = width;
 	current_viewport_height = height;
 }
@@ -328,13 +331,27 @@ glm::vec2 viewport() {
 	return {current_viewport_width, current_viewport_height};
 }
 
-void clear(float red, float green, float blue, float alpha) {
-	glClearColor(red, green, blue, alpha);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void beginPass(const Framebuffer& framebuffer,
+               GLbitfield clear_mask,
+               const float clear_color[], float clear_depth) {
+	glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
+	glClearDepthf(clear_depth);
+
+	const auto& size = framebuffer.size();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.framebuffer());
+
+	if (framebuffer.framebuffer() != 0) {
+		glViewport(0, 0, size.x, size.y);
+	} else {
+		glViewport(0, 0, current_viewport_width, current_viewport_height);
+	}
+
+	glClear(clear_mask);
 }
 
-void setFramebuffer(const Framebuffer& framebuffer) {
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.framebuffer());
+void endPass() {
+	// TODO Framebuffer invalidation
 }
 
 void setPipeline(const Pipeline& pipeline) {

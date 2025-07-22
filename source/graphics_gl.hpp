@@ -9,6 +9,7 @@
 #include <glad/gles2.h>
 
 #include <glm/ext/vector_float2.hpp>
+#include <glm/ext/vector_uint2.hpp>
 
 namespace glint::graphics::gl {
 
@@ -101,14 +102,17 @@ public:
 	Texture& operator=(const Texture&) = delete;
 	Texture& operator=(Texture&&) noexcept = delete;
 
-	GLenum type() const noexcept { return type_; }
 	GLenum format() const noexcept { return format_; }
+	glm::uvec2 size() const noexcept { return size_; }
+
+	GLenum type() const noexcept { return type_; }
 	GLuint handle() const noexcept { return handle_; }
 
 private:
-	GLenum type_;
 	GLenum format_;
-	
+	glm::uvec2 size_;
+
+	GLenum type_;
 	GLuint handle_;
 };
 
@@ -189,6 +193,7 @@ public:
 	Framebuffer& operator=(Framebuffer&&) noexcept = delete;
 
 	GLuint framebuffer() const noexcept { return handle_; }
+	glm::uvec2 size() const noexcept { return size_; }
 
 	static Framebuffer main() { return {}; }
 
@@ -198,6 +203,8 @@ private:
 
 private:
 	GLuint handle_;
+
+	glm::uvec2 size_;
 };
 
 void setup(uint32_t width, uint32_t height);
@@ -206,6 +213,11 @@ void shutdown();
 glm::vec2 viewport();
 void clear(float red, float green, float blue, float alpha);
 void setFramebuffer(const Framebuffer& framebuffer);
+
+void beginPass(const Framebuffer& framebuffer,
+               GLbitfield clear_mask,
+               const float clear_color[4], float clear_depth = 1.0f);
+void endPass();
 
 void setPipeline(const Pipeline&);
 void setVertexBuffer(const Buffer&);

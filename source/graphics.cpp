@@ -191,9 +191,9 @@ void shutdown() {
 void render(const std::span<const Model> models,
             const Camera& camera,
             const std::span<const Light> lights) {
-	gl::setFramebuffer(*shadow_map_framebuffer);
-	glViewport(0, 0, shadow_map_size, shadow_map_size);
-	gl::clear(0.0f, 0.0f, 0.0f, 1.0f);
+	const float clear_color[] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+	gl::beginPass(*shadow_map_framebuffer, GL_DEPTH_BUFFER_BIT, clear_color);
 
 	glm::mat4 shadow_projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 20.0f);
 	glm::mat4 shadow_view = glm::lookAt(glm::vec3(4.0f, 4.0f, 4.0f),
@@ -218,9 +218,11 @@ void render(const std::span<const Model> models,
 		gl::draw(model.mesh.count());
 	}
 
-	gl::setFramebuffer(gl::Framebuffer::main());
-	glViewport(0, 0, camera.viewport.x, camera.viewport.y);
-	gl::clear(0.0f, 0.0f, 0.0f, 1.0f);
+	gl::endPass();
+
+	gl::beginPass(gl::Framebuffer::main(),
+	              GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
+	              clear_color);
 
 	SkyUniforms sky_uniforms{
 		.view = glm::mat4(mat3_cast(camera.calculateOrientation())),
@@ -271,6 +273,8 @@ void render(const std::span<const Model> models,
 
 		gl::draw(model.mesh.count());
 	}
+
+	gl::endPass();
 }
 
 Mesh Mesh::makeCube() {
